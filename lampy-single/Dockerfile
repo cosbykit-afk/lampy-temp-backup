@@ -48,8 +48,9 @@ USER root
 ENTRYPOINT []
 
 COPY --from=ollama-src /usr/bin/ollama /usr/bin/ollama
-# The CLI alone cannot serve: it execs the llama-server runner from
-# /usr/lib/ollama. Without this, `ollama serve` fails at startup.
+# The CLI alone cannot run inference: `ollama serve` starts and /api/tags
+# works, but every model run fails with "llama-server binary not found"
+# because the runner lives in /usr/lib/ollama. Copy the whole lib dir.
 COPY --from=ollama-src /usr/lib/ollama /usr/lib/ollama
 
 RUN mkdir -p /usr/share/man/man1 \

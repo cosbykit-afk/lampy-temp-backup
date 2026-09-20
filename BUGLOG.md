@@ -364,17 +364,23 @@ status. A fix that unblocks new work is noted as such.
      fails with "DefaultRuntimeDir must be a valid directory". Verified:
      chroot configtest fails without the dirs, "Syntax OK" with them.
      Dockerfile now mkdirs both at build time.
-  2. `ollama serve` would fail at startup: Dockerfile copied only /usr/bin/ollama
-     (the CLI) from the donor image; the CLI execs the llama-server runner from
-     /usr/lib/ollama, which was absent ("llama-server binary not found" when
-     attempting inference with the image's binary). Dockerfile now copies
-     /usr/lib/ollama too; pressure-test gained a regression check.
+  2. ollama inference would fail (the server itself starts): Dockerfile copied
+     only /usr/bin/ollama (the CLI) from the donor image; the CLI execs the
+     llama-server runner from /usr/lib/ollama, which was absent — `ollama serve`
+     starts and /api/tags responds, but any model run fails with
+     "llama-server binary not found" (verified by direct API test with the
+     image's binary). Dockerfile now copies /usr/lib/ollama too; pressure-test
+     gained a regression check.
   3. /tmp/hsperfdata_root left in image (JVM debris). Dockerfile now removes it.
 - Also committed: base-image digest pins (timescale + ollama donors, digests
   from the successful build log), Apache ServerName localhost.
-- Latest run: 58 PASS / 2 FAIL / 7 SKIP. The 2 FAILs are exactly the two
-  findings above awaiting rebuild (apache configtest, /tmp clean) — both fixed
-  in the Dockerfile, verified by experiment to be fixed-by-rebuild.
+- Latest scripted run (predates the ollama regression check): 58 PASS /
+  2 FAIL / 7 SKIP. The 2 FAILs are findings #1 and #3 above (apache
+  configtest, /tmp clean) — both fixed in the Dockerfile, verified by
+  experiment to be fixed-by-rebuild. Finding #2 (ollama runners) was caught by
+  direct experiment after that run; the script now checks for it, so the next
+  run against the current pushed image is expected to show 3 FAILs until the
+  rebuild lands.
 - Rebuild attempted via Build Cloud with the sandbox relay (procedure now
   documented in build-cloud.sh): got PAST the TLS/proxy issue, then failed
   cleanly on `no credentials found for https://index.docker.io/v1/` — the
