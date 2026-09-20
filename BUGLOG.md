@@ -323,3 +323,73 @@ status. A fix that unblocks new work is noted as such.
   the flag (and EXTERNALLY-MANAGED enforcement) arrived in pip 23. Plain
   `pip install --no-cache-dir pgai` is correct here. Comment added to the
   Dockerfile explaining why the flag is absent.
+
+## 2026-09-20 ~07:41 PDT — lampy-single cloud build SUCCEEDED and pushed (BUILD DONE)
+- Third attempt: exit 0. All 12 stage-2 steps completed (apt fix + pip fix both
+  held; pgai 0.12.1 installed; james COPY, code-server ADD, apache vhost,
+  supervisord conf all applied).
+- Pushed: kitcosby/lampy-single:latest
+  digest sha256:2e2d103715b8cc9e9cdc4242e498df41b0c03825249986d6fba9129469956b03
+  (manifest list; linux/amd64 image manifest
+  sha256:5ef26953a81c0b621c0dc1ea6dbf625b6932b476d9442738787407370cd8624d).
+- Independently verified via `docker buildx imagetools inspect` (no pull):
+  registry serves the tag, digest matches build output exactly.
+- Build Cloud minutes used: ~3.5 min total across 3 attempts (200 free on trial).
+- Scope honesty: BUILD success only. The image has NOT been run — this sandbox
+  cannot launch containers (setns blocked, U-22). Runtime validation
+  (postgres, httpd, ollama, james, code-server, pgai worker) waits for
+  Windows Docker Desktop when Kit is back at his laptop (~Sept 23).
+- Cleanup done: `docker logout`, config.json holds no credential, relay killed.
+- Update 07:43 PDT: Kit keeps the non-expiring PAT in the Secure Vault for
+  reuse (revocation superseded). Remaining: remove temporary `pat-test` tag
+  (needs Kit's OK); git push still failing on SSH (commits local-only).
+
+## 2026-09-20 ~08:05 PDT — pressure-test workflow built and run; real image bugs found (2 fixed in Dockerfile, rebuild pending)
+- New workflow `lampy-single/pressure-test.sh` (Kit's directive: "pressure test
+  the configuration to make the best image we can provide"). Six suites, no
+  container needed: registry/build provenance, static file/binary/config audit
+  (exported rootfs), supervisord/apache/shell config checks, real binary smoke
+  tests via chroot+userns, two-tier secret scan, size/hygiene + Dockerfile lint.
+  Seven runtime checks explicitly deferred to Windows (needs docker run).
+- First run: 48 PASS / 11 FAIL / 7 SKIP. Most FAILs were checker/sandbox
+  artifacts (fixed in the script, not the image): rootfs symlink resolution
+  (code-server, docker-entrypoint.sh, /var/run/supervisor are absolute
+  symlinks — must resolve inside the rootfs, not against the host); java
+  needs LD_LIBRARY_PATH inside chroot; apache2 -t needs envvars sourced;
+  secret-scan hits were Debian snakeoil + known-benign test material.
+- REAL image bugs found (all verified by direct experiment, fixes committed,
+  rebuild blocked on Docker Hub push auth — see below):
+  1. apache would crash-loop at startup: /var/run/apache2 and /var/lock/apache2
+     are missing from the image, so `apache2ctl -D FOREGROUND` (supervisord)
+     fails with "DefaultRuntimeDir must be a valid directory". Verified:
+     chroot configtest fails without the dirs, "Syntax OK" with them.
+     Dockerfile now mkdirs both at build time.
+  2. `ollama serve` would fail at startup: Dockerfile copied only /usr/bin/ollama
+     (the CLI) from the donor image; the CLI execs the llama-server runner from
+     /usr/lib/ollama, which was absent ("llama-server binary not found" when
+     attempting inference with the image's binary). Dockerfile now copies
+     /usr/lib/ollama too; pressure-test gained a regression check.
+  3. /tmp/hsperfdata_root left in image (JVM debris). Dockerfile now removes it.
+- Also committed: base-image digest pins (timescale + ollama donors, digests
+  from the successful build log), Apache ServerName localhost.
+- Latest run: 58 PASS / 2 FAIL / 7 SKIP. The 2 FAILs are exactly the two
+  findings above awaiting rebuild (apache configtest, /tmp clean) — both fixed
+  in the Dockerfile, verified by experiment to be fixed-by-rebuild.
+- Rebuild attempted via Build Cloud with the sandbox relay (procedure now
+  documented in build-cloud.sh): got PAST the TLS/proxy issue, then failed
+  cleanly on `no credentials found for https://index.docker.io/v1/` — the
+  cloud driver needs Docker Hub auth and the Secure Vault cannot release the
+  PAT to the CLI. Rebuild+push queued until Kit can provide auth (laptop,
+  ~Sept 23, or his direction). Current pushed image is functionally identical
+  in content (pins resolve to the same digests); the pending rebuild adds
+  only the three fixes above.
+
+## 2026-09-20 ~08:10 PDT — Musey model created (Ollama)
+- Kit: "create a Muse-style Ollama model named Musey." Extracted the ollama
+  binary from the lampy-single image, ran a local server, pulled qwen3:0.6b
+  as the base, created `musey` from ~/workspace/ollama-test/Modelfile.musey.
+  The Modelfile states plainly it is NOT Muse's weights — open-weights base
+  with a Musey persona (concise, honest about being a small model).
+- Inference smoke test pending: the image's ollama binary lacks its runner
+  libs (finding #2 above); downloading the full Ollama Linux tarball to run
+  the first inference test.
