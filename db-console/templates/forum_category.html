@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ cat.name }} — Forum — Lampy Console{% endblock %}
+{% block content %}
+<div class="forumwrap">
+  <p class="crumbs"><a href="/forum">Forum</a> / {{ cat.name }}</p>
+  <h1 class="search-h">{{ cat.name }}</h1>
+  <p class="dbnote">{{ cat.description }}</p>
+  {% if not live %}
+  <p class="demobanner">Demo data — the forum database is not yet provisioned.</p>
+  {% endif %}
+  {% if threads %}
+  <ul class="threadlist">
+    {% for t in threads %}
+    <li>
+      <a href="/forum/thread/{{ t.id }}">{{ t.title }}</a>
+      {% if t.is_locked %}<span class="lockbadge">locked</span>{% endif %}
+      <span class="threadmeta">by {{ t.username }}{% if t.is_moderator_post %} <span class="modbadge">mod</span>{% endif %}
+        · {{ t.post_count }} posts</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="dbnote">No threads yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

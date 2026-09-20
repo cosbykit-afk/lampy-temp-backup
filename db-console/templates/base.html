@@ -12,7 +12,14 @@
   <a class="brand" href="/"><span class="brand-mark">⬢</span> Lampy&nbsp;Console</a>
   <nav class="topnav">
     <a href="/" class="{{ 'active' if section == 'docs' else '' }}">Docs</a>
+    <a href="/forum" class="{{ 'active' if section == 'forum' else '' }}">Forum</a>
     <a href="/database" class="{{ 'active' if section == 'database' else '' }}">Database</a>
+    {% if console_user %}
+    <span class="userchip">👤 {{ console_user.username }}{% if console_user.is_admin %} (mod){% endif %}</span>
+    <a href="/logout">Log out</a>
+    {% else %}
+    <a href="/login">Log in</a>
+    {% endif %}
   </nav>
   <form class="gsearch" action="/search" method="get" role="search">
     <svg class="gsearch-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -24,6 +31,21 @@
 </header>
 
 <div class="layout">
+  {% if section == 'forum' %}
+  <aside class="sidenav" aria-label="Forum boards">
+    <div class="sidenav-head">Forum boards</div>
+    <ul class="navlist">
+      <li><a href="/forum">All boards</a></li>
+      {% for item in forum_nav %}
+      <li><a href="{{ item.url }}">{{ item.label }}</a></li>
+      {% endfor %}
+      <li><a href="/forum/moderate">🛡 Moderation queue</a></li>
+    </ul>
+    <div class="sidenav-head" style="margin-top:18px">Moderator</div>
+    <div class="modcard">🤖 <b>Musey</b><br>
+      <span class="modsub">musey@lampy.local · AI moderator</span></div>
+  </aside>
+  {% else %}
   <aside class="sidenav" aria-label="Tutorial series">
     <div class="sidenav-head">R Theory — Tutorial Series</div>
     {% for vol in nav %}
@@ -37,6 +59,7 @@
     </ul>
     {% endfor %}
   </aside>
+  {% endif %}
 
   <main class="docmain">
     {% block content %}{% endblock %}

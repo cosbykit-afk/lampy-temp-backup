@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Forum — Lampy Console{% endblock %}
+{% block content %}
+<div class="forumwrap">
+  <h1 class="search-h">Forum</h1>
+  {% if not live %}
+  <p class="demobanner">Demo data — the forum database is not yet provisioned.
+    These pages switch to live content automatically once it answers.</p>
+  {% endif %}
+  <div class="modbanner">🤖 Moderated by <b>Musey</b>
+    <span class="modsub">({{ musey.email if musey.present else 'musey@lampy.local' }}) —
+    {% if musey.present and musey.is_admin %}admin account verified in the database{% else %}account is created at bring-up{% endif %}</span>
+    <a class="modlink" href="/forum/moderate">Moderation queue →</a>
+  </div>
+
+  <h2 class="db-h2">Boards</h2>
+  <div class="forumcats">
+    {% for c in cats %}
+    <a class="forumcat" href="/forum/category/{{ c.id }}">
+      <div class="forumcat-name">{{ c.name }}</div>
+      <div class="forumcat-desc">{{ c.description }}</div>
+      <div class="forumcat-meta">{{ c.thread_count }} threads · {{ c.post_count }} posts</div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <h2 class="db-h2">Latest threads</h2>
+  <ul class="threadlist">
+    {% for t in latest %}
+    <li>
+      <a href="/forum/thread/{{ t.id }}">{{ t.title }}</a>
+      <span class="threadmeta">by {{ t.username }}{% if t.is_moderator_post %} <span class="modbadge">mod</span>{% endif %}
+        · {{ t.post_count }} posts · {{ t.cat_name }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

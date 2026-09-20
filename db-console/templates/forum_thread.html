@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ th.title }} — Forum — Lampy Console{% endblock %}
+{% block content %}
+<div class="forumwrap">
+  <p class="crumbs"><a href="/forum">Forum</a> /
+    <a href="/forum/category/{{ th.category_id }}">{{ th.cat_name }}</a> / {{ th.title }}</p>
+  <h1 class="search-h">{{ th.title }}</h1>
+  {% if not live %}
+  <p class="demobanner">Demo data — the forum database is not yet provisioned.</p>
+  {% endif %}
+  {% for p in posts %}
+  <article class="post {{ 'modpost' if p.is_moderator_post else '' }}">
+    <header class="posthead">
+      <span class="postuser">{{ p.username }}</span>
+      {% if p.is_moderator_post %}<span class="modbadge">🤖 moderator</span>{% endif %}
+      <span class="postdate">{{ p.created_at }}</span>
+    </header>
+    <div class="postbody">{{ p.body }}</div>
+  </article>
+  {% endfor %}
+  <p class="dbnote">Read-only here — replies are posted in the forum app itself.</p>
+</div>
+{% endblock %}

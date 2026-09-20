@@ -21,17 +21,49 @@
       {% if err %}<br><span class="dberr">Last probe: {{ err }}</span>{% endif %}
     </p>
     {% else %}
-    <p class="dbnote">Port {{ port }} answers. Table browser, row counts, and
-    the query runner land here next — read-only until an admin signs in.</p>
+    <p class="dbnote">Port {{ port }} answers. Live table counts and the Musey
+    account check are shown below; the query runner lands here next — read-only
+    until an admin signs in.</p>
     {% endif %}
   </div>
 
+  {% if reachable %}
+  <h2 class="db-h2">Forum tables</h2>
+  <div class="dbcard ok">
+    <table class="dbtable">
+      {% for tbl, n in counts.items() %}
+      <tr><th>{{ tbl }}</th><td>{{ n }} rows</td></tr>
+      {% endfor %}
+    </table>
+    <p class="dbnote"><a href="/forum">Open the forum →</a> (read-only view of
+    boards, threads, and posts).</p>
+  </div>
+
+  <h2 class="db-h2">Musey moderator account</h2>
+  <div class="dbcard {{ 'ok' if musey.present and musey.is_admin else 'pending' }}">
+    <div class="dbstatus">{{ '● Present' if musey.present else '○ Not created yet' }}</div>
+    <table class="dbtable">
+      <tr><th>Username</th><td>{{ musey.username }}</td></tr>
+      <tr><th>Email</th><td>{{ musey.email }}</td></tr>
+      <tr><th>is_admin</th><td>{{ musey.is_admin }}</td></tr>
+    </table>
+    {% if not musey.present %}
+    <p class="dbnote">Create at bring-up with
+      <code>installer/seed-musey-admin.py</code> after applying
+      <code>forum/schema.sql</code>.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <h2 class="db-h2">Coming at bring-up</h2>
   <ul class="dbtodo">
-    <li>Table browser — <code>users</code>, <code>forum_events</code>, and the schema in <code>forum/schema.sql</code></li>
-    <li>Musey admin account check — <code>musey@lampy.local</code>, <code>is_admin = TRUE</code></li>
+    <li>Table browser drill-down (per-table row views)</li>
     <li>pgAI / vectorizer status and embedding-path verification</li>
     <li>Read-only query runner (parameterized, row-limited)</li>
   </ul>
+  <p class="dbnote">Already live-capable: row counts, the Musey account check,
+  and the read-only <a href="/forum">forum view</a> with the
+  <a href="/forum/moderate">moderation queue</a> — all activate automatically
+  once the database port answers.</p>
 </div>
 {% endblock %}

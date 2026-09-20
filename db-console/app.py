@@ -22,12 +22,26 @@ import os
 import re
 import socket
 
-from flask import Flask, abort, render_template, request, send_from_directory
+from flask import Flask, abort, jsonify, render_template, request, \
+    send_from_directory, session
+
+import forum_data
+import musey_moderation
+import auth
 
 CONTENT_ROOT = os.path.abspath(os.path.expanduser(
     os.environ.get("R_THEORY_DIR", "~/workspace/r-theory-rewrite")))
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FORUM_SECRET_KEY", "")
+if not app.secret_key:
+    # Dev-only fallback: sessions won't survive restarts and aren't secure.
+    app.secret_key = "dev-only-change-me"
+
+
+@app.context_processor
+def _inject_console_user():
+    return {"console_user": auth.current_console_user()}
 
 # ----------------------------------------------------------------------------
 # Page loading: discover index.html files, then extract + normalize each page
@@ -286,9 +300,12 @@ def database():
         reachable = True
     except Exception as e:  # refused / timeout / unreachable
         err = "%s: %s" % (type(e).__name__, e)
+    counts = forum_data.get_table_counts() if reachable else {}
+    musey = forum_data.get_musey_status()
     return render_template("database.html", section="database", nav=NAV_ITEMS,
                            active="index", host=host, port=port, dbname=dbname,
-                           user=user, reachable=reachable, err=err)
+                           user=user, reachable=reachable, err=err,
+                           counts=counts, musey=musey)
 
 
 @app.get("/rtheory-files/<path:fname>")
@@ -296,11 +313,118 @@ def rtheory_files(fname):
     return send_from_directory(CONTENT_ROOT, fname)
 
 
+# ----------------------------------------------------------------------------
+# Forum — read-only view of the forum database, with Musey as moderator
+# ----------------------------------------------------------------------------
+
+def _forum_nav():
+    cats, _latest, _live = forum_data.get_overview()
+    return [{"slug": "forum", "label": c["name"], "title": c["name"],
+             "url": "/forum/category/%d" % c["id"]} for c in cats]
+
+
+@app.get("/forum")
+def forum_index():
+    cats, latest, live = forum_data.get_overview()
+    return render_template("forum_index.html", section="forum",
+                           forum_nav=_forum_nav(), cats=cats, latest=latest,
+                           live=live, musey=forum_data.get_musey_status())
+
+
+@app.get("/forum/category/<int:cat_id>")
+def forum_category(cat_id):
+    cat, threads, live = forum_data.get_category(cat_id)
+    if cat is None:
+        abort(404)
+    return render_template("forum_category.html", section="forum",
+                           forum_nav=_forum_nav(), cat=cat, threads=threads,
+                           live=live)
+
+
+@app.get("/forum/thread/<int:thread_id>")
+def forum_thread(thread_id):
+    th, posts, live = forum_data.get_thread(thread_id)
+    if th is None:
+        abort(404)
+    return render_template("forum_thread.html", section="forum",
+                           forum_nav=_forum_nav(), th=th, posts=posts,
+                           live=live)
+
+
+@app.get("/forum/moderate")
+@auth.admin_required
+def forum_moderate():
+    posts, live = forum_data.get_recent_posts(limit=10)
+    ok, models = musey_moderation.ollama_available()
+    return render_template("forum_moderate.html", section="forum",
+                           forum_nav=_forum_nav(), posts=posts, live=live,
+                           ollama_ok=ok, ollama_models=models,
+                           reviews=musey_moderation.recent_reviews(),
+                           musey_model=musey_moderation.MODEL)
+
+
+@app.post("/forum/musey-review")
+@auth.admin_required
+def forum_musey_review():
+    data = request.get_json(force=True, silent=True) or {}
+    post_id = data.get("post_id")
+    username = data.get("username", "")
+    body = (data.get("body") or "").strip()
+    if not body:
+        return jsonify({"verdict": "ERROR",
+                        "error": "empty post body"}), 400
+    result = musey_moderation.review_post(body)
+    entry = musey_moderation.log_review(post_id, username, body, result)
+    return jsonify(entry)
+
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template("search.html", section="docs", nav=NAV_ITEMS,
                            active="index", q="", results=[],
                            notice="Page not found."), 404
+
+
+# ----------------------------------------------------------------------------
+# Logon — credentials verified against the forum database's users table
+# ----------------------------------------------------------------------------
+
+@app.get("/login")
+def login():
+    if auth.current_console_user():
+        return redirect("/forum/moderate")
+    return render_template("login.html", section="forum",
+                           forum_nav=_forum_nav(),
+                           next=request.args.get("next", ""), error="")
+
+
+@app.post("/login")
+def login_post():
+    if auth.current_console_user():
+        return redirect("/forum/moderate")
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    nxt = request.form.get("next", "") or "/forum/moderate"
+    if not (nxt.startswith("/") and not nxt.startswith("//")):
+        nxt = "/forum/moderate"  # relative-path redirects only
+    error = ""
+    try:
+        user = auth.verify_login(username, password)
+    except RuntimeError as e:
+        user, error = None, str(e)
+    if user is None and not error:
+        error = "Invalid username or password."
+    if error:
+        return render_template("login.html", section="forum",
+                               forum_nav=_forum_nav(), next=nxt, error=error)
+    session["console_user"] = user
+    return redirect(nxt)
+
+
+@app.get("/logout")
+def logout():
+    session.pop("console_user", None)
+    return redirect("/forum")
 
 
 if __name__ == "__main__":

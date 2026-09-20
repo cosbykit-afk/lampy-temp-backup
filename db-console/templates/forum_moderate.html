@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Moderation queue — Forum — Lampy Console{% endblock %}
+{% block head_extra %}
+<script>
+async function museyReview(btn, postId, username, body) {
+  const box = document.getElementById("verdict-" + postId);
+  btn.disabled = true;
+  box.innerHTML = '<span class="verdict-pending">Musey is reading…</span>';
+  try {
+    const r = await fetch("/forum/musey-review", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({post_id: postId, username: username, body: body})
+    });
+    const d = await r.json();
+    const cls = d.verdict === "OK" ? "verdict-ok"
+              : d.verdict === "FLAG" ? "verdict-flag" : "verdict-error";
+    box.innerHTML = '<span class="' + cls + '">VERDICT: ' + d.verdict + "</span>"
+      + (d.reason ? " — " + d.reason : "")
+      + (d.error && d.verdict === "ERROR" ? " (" + d.error + ")" : "")
+      + ' <span class="modsub">(' + d.model + ", " + d.ms + " ms)</span>";
+  } catch (e) {
+    box.innerHTML = '<span class="verdict-error">request failed: ' + e + "</span>";
+  }
+  btn.disabled = false;
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="forumwrap">
+  <h1 class="search-h">🛡 Moderation queue</h1>
+  <div class="modbanner">🤖 <b>Musey</b> ({{ musey_model }}) reviews each post for
+    spam, abuse, or off-topic commercial content.
+    <span class="modsub">Experimental — small open-weights model; every verdict is advisory and logged.</span>
+  </div>
+  {% if not ollama_ok %}
+  <p class="demobanner">Ollama is not reachable — start it and pull <code>{{ musey_model }}</code> to enable reviews.</p>
+  {% endif %}
+  {% if not live %}
+  <p class="demobanner">Demo data — the forum database is not yet provisioned.</p>
+  {% endif %}
+
+  {% for p in posts %}
+  <article class="post {{ 'modpost' if p.is_moderator_post else '' }}">
+    <header class="posthead">
+      <span class="postuser">{{ p.username }}</span>
+      {% if p.is_moderator_post %}<span class="modbadge">🤖 moderator</span>{% endif %}
+      <span class="postdate">in <a href="/forum/thread/{{ p.thread_id }}">{{ p.title }}</a> · {{ p.created_at }}</span>
+    </header>
+    <div class="postbody">{{ p.body }}</div>
+    <div class="modrow">
+      <button class="modbtn" onclick='museyReview(this, {{ p.id }}, {{ p.username|tojson }}, {{ p.body|tojson }})'
+        {{ '' if ollama_ok else 'disabled' }}>Ask Musey to review</button>
+      <span id="verdict-{{ p.id }}" class="verdict"></span>
+    </div>
+  </article>
+  {% endfor %}
+
+  {% if reviews %}
+  <h2 class="db-h2">Recent Musey verdicts</h2>
+  <ul class="threadlist">
+    {% for r in reviews %}
+    <li>
+      <span class="{{ 'verdict-ok' if r.verdict == 'OK' else 'verdict-flag' if r.verdict == 'FLAG' else 'verdict-error' }}">VERDICT: {{ r.verdict }}</span>
+      <span class="threadmeta">post #{{ r.post_id }} by {{ r.username }} · {{ r.ts }}{% if r.reason %} — {{ r.reason }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}
