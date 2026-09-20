@@ -367,6 +367,27 @@ script (re-runnable).
 **not** expose 5432 beyond the app host. If the app runs on another machine,
 add one `hostssl` line for the app host's IP with `scram-sha-256`.
 
+### 4.5 Musey admin account
+
+The forum has no admin-promotion UI (by design), so the first admin is
+seeded directly. `installer/seed-musey-admin.py` is idempotent — run it
+once after the schema is in place, and again any time the account needs
+repairing:
+
+```bash
+FORUM_DB_HOST=127.0.0.1 FORUM_DB_PORT=5432 FORUM_DB_NAME=forum \
+FORUM_DB_USER=forum FORUM_DB_PASS=<deploy-time password> \
+python3 installer/seed-musey-admin.py
+```
+
+It creates user `musey` (`musey@lampy.local`) with `is_admin = TRUE` and a
+werkzeug hash exactly as `/register` would store it. The password is a
+fresh 32-character random value printed **once** to the operator's console
+for recording — never written to disk or logged. To choose the password
+yourself instead, set `MUSEY_PASSWORD` in the environment. `--dry-run`
+validates without touching the database; `--reset-password` re-issues the
+password on an existing account.
+
 ## 5. pgrx toolchain (Rust → PostgreSQL extensions) [in progress]
 
 For building custom PG extensions in Rust later. Not required at runtime.

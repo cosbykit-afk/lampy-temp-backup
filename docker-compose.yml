@@ -29,14 +29,23 @@
 
 services:
   httpd:
-    image: httpd:latest
+    # Pinned 2026-09-20 (linux/amd64 digest of httpd:2.4) — repo convention:
+    # base images are digest-pinned so rebuilds don't drift.
+    image: httpd:2.4@sha256:3a1e0bbe28c4673a03b7a3fbc71a56325eacb1a8d11c1ad696fbf9678f07febd
     container_name: lampy-httpd
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
       - ./httpd/htdocs:/usr/local/apache2/htdocs:ro
+    # Startup-order contract: httpd reverse-proxies /app to the "app" service
+    # (Flask on port 8000), which does not exist yet. Keep this service after
+    # the app service exists (depends_on gets added with it); the restart
+    # policy above self-heals an ordering race in the meantime. httpd.conf
+    # syntax check is still pending (httpd -t on the image) — see httpd.conf
+    # header.
 
   db:
     image: timescale/timescaledb-ha:pg16
