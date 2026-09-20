@@ -164,7 +164,8 @@ else
 fi
 
 # code-server symlink must resolve to a real extracted directory.
-if [ -d "$ROOTFS/opt/code-server" ]; then
+r="$(resolve /opt/code-server)"
+if [ -d "$r" ]; then
     pass "code-server symlink resolves"
 else
     fail "code-server symlink resolves" "points at $(readlink "$ROOTFS/opt/code-server")"
@@ -362,7 +363,8 @@ else
 fi
 # Also scan the repo build context (Dockerfile, confs, scripts).
 CTX="$(cd "$(dirname "$0")" && pwd)"
-CHITS="$(grep -rIlE "$PATTERNS" "$CTX/Dockerfile" "$CTX/supervisord.conf" \
+CHITS="$(grep -rIlE 'ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|dckr_pat_[A-Za-z0-9_\-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|xox[bap]-' \
+    "$CTX/Dockerfile" "$CTX/supervisord.conf" \
     "$CTX/pgai-worker.sh" "$CTX/apache2-lampy.conf" "$CTX/build-cloud.sh" 2>/dev/null)"
 if [ -z "$CHITS" ]; then
     pass "no secret patterns in build context files"

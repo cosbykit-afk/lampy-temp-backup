@@ -81,6 +81,7 @@ COPY lampy-single/supervisord.conf /etc/supervisor/conf.d/lampy.conf
 COPY lampy-single/pgai-worker.sh /usr/local/bin/pgai-worker.sh
 RUN chmod +x /usr/local/bin/pgai-worker.sh \
     && mkdir -p /var/log/supervisor /var/run/supervisor \
+    && mkdir -p /var/run/apache2 /var/lock/apache2 \
     && rm -rf /tmp/hsperfdata_root
 
 EXPOSE 80 443 5432 11434 8080 2525 2465 2587 1143 1993 1110
