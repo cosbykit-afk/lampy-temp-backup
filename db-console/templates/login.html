@@ -11,6 +11,7 @@
   {% endif %}
   <form method="post" action="/login" class="loginform">
     <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label>Username<br><input type="text" name="username" autocomplete="username" required></label><br>
     <label>Password<br><input type="password" name="password" autocomplete="current-password" required></label><br>
     <button class="modbtn" type="submit">Log in</button>

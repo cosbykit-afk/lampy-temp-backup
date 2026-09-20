@@ -16,7 +16,9 @@
     <a href="/database" class="{{ 'active' if section == 'database' else '' }}">Database</a>
     {% if console_user %}
     <span class="userchip">👤 {{ console_user.username }}{% if console_user.is_admin %} (mod){% endif %}</span>
-    <a href="/logout">Log out</a>
+    <form action="/logout" method="post" class="logoutform">
+      <button type="submit" class="navbtn">Log out</button>
+    </form>
     {% else %}
     <a href="/login">Log in</a>
     {% endif %}

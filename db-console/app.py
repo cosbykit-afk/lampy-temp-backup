@@ -12,9 +12,11 @@ Layout: top bar with a Google-style search box, left side-panel navigation
 panel until the database is provisioned (Windows bring-up ~2026-09-23).
 
 Run:
-    R_THEORY_DIR=~/workspace/r-theory-rewrite \
+    CONSOLE_DEV=1 R_THEORY_DIR=~/workspace/r-theory-rewrite \
     ~/workspace/forum/venv/bin/python app.py
-Serves on 127.0.0.1:5001 (localhost only — add auth before exposing).
+Serves on 127.0.0.1:5001 (localhost only). Production needs FORUM_SECRET_KEY
+from the Secure Vault (the app refuses to start without it) and HTTPS in
+front, since the session cookie is marked Secure outside dev mode.
 """
 
 import html as ihtml
@@ -22,21 +24,24 @@ import os
 import re
 import socket
 
-from flask import Flask, abort, jsonify, render_template, request, \
-    send_from_directory, session
+from flask import Flask, abort, jsonify, make_response, redirect, \
+    render_template, request, send_from_directory, session
 
 import forum_data
 import musey_moderation
 import auth
+import security
 
 CONTENT_ROOT = os.path.abspath(os.path.expanduser(
     os.environ.get("R_THEORY_DIR", "~/workspace/r-theory-rewrite")))
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FORUM_SECRET_KEY", "")
-if not app.secret_key:
-    # Dev-only fallback: sessions won't survive restarts and aren't secure.
-    app.secret_key = "dev-only-change-me"
+# Refuses to start without a real secret outside CONSOLE_DEV=1.
+app.secret_key = security.load_secret_key()
+security.configure_session_cookies(app)
+
+# Throttles password guessing on /login (per client IP, in-memory).
+login_limiter = security.LoginRateLimiter()
 
 
 @app.context_processor
@@ -360,11 +365,13 @@ def forum_moderate():
                            forum_nav=_forum_nav(), posts=posts, live=live,
                            ollama_ok=ok, ollama_models=models,
                            reviews=musey_moderation.recent_reviews(),
-                           musey_model=musey_moderation.MODEL)
+                           musey_model=musey_moderation.MODEL,
+                           csrf_token=security.csrf_token())
 
 
 @app.post("/forum/musey-review")
 @auth.admin_required
+@security.csrf_required_json
 def forum_musey_review():
     data = request.get_json(force=True, silent=True) or {}
     post_id = data.get("post_id")
@@ -395,34 +402,54 @@ def login():
         return redirect("/forum/moderate")
     return render_template("login.html", section="forum",
                            forum_nav=_forum_nav(),
-                           next=request.args.get("next", ""), error="")
+                           next=request.args.get("next", ""), error="",
+                           csrf_token=security.csrf_token())
 
 
 @app.post("/login")
 def login_post():
     if auth.current_console_user():
         return redirect("/forum/moderate")
+    ip = security.client_ip()
+    retry_after = login_limiter.check(ip)
+    if retry_after is not None:
+        resp = make_response(render_template(
+            "login.html", section="forum", forum_nav=_forum_nav(),
+            next=request.form.get("next", ""),
+            csrf_token=security.csrf_token(),
+            error="Too many login attempts — try again in %d seconds."
+                  % retry_after), 429)
+        resp.headers["Retry-After"] = str(retry_after)
+        return resp
+    if not security.validate_csrf_form():
+        abort(400, "CSRF token missing or invalid")
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
     nxt = request.form.get("next", "") or "/forum/moderate"
     if not (nxt.startswith("/") and not nxt.startswith("//")):
         nxt = "/forum/moderate"  # relative-path redirects only
-    error = ""
     try:
         user = auth.verify_login(username, password)
     except RuntimeError as e:
-        user, error = None, str(e)
-    if user is None and not error:
-        error = "Invalid username or password."
-    if error:
+        # Honest failure: the account database is down, not the password.
         return render_template("login.html", section="forum",
-                               forum_nav=_forum_nav(), next=nxt, error=error)
+                               forum_nav=_forum_nav(), next=nxt, error=str(e),
+                               csrf_token=security.csrf_token()), 503
+    if user is None:
+        login_limiter.record_failure(ip)
+        return render_template("login.html", section="forum",
+                               forum_nav=_forum_nav(), next=nxt,
+                               error="Invalid username or password.",
+                               csrf_token=security.csrf_token()), 401
+    login_limiter.record_success(ip)
+    security.rotate_csrf_token()
     session["console_user"] = user
     return redirect(nxt)
 
 
-@app.get("/logout")
+@app.post("/logout")
 def logout():
+    # POST only: a GET link could be triggered by a third-party page.
     session.pop("console_user", None)
     return redirect("/forum")
 

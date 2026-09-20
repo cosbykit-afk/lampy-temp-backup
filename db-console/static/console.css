@@ -41,6 +41,14 @@ a { color: var(--do-blue); }
 }
 .topnav a:hover { color: var(--ink); background: var(--wash); }
 .topnav a.active { color: var(--do-blue); }
+/* POST-only logout: a button styled as a nav link */
+.logoutform { display: inline; margin: 0; }
+.navbtn {
+  background: none; border: none; cursor: pointer; font: inherit;
+  color: var(--muted); font-weight: 600; font-size: 15px;
+  padding: 8px 12px; border-radius: 8px;
+}
+.navbtn:hover { color: var(--ink); background: var(--wash); }
 
 /* Google-style search box */
 .gsearch {

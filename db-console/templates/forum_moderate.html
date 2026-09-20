@@ -2,6 +2,7 @@
 {% block title %}Moderation queue — Forum — Lampy Console{% endblock %}
 {% block head_extra %}
 <script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
 async function museyReview(btn, postId, username, body) {
   const box = document.getElementById("verdict-" + postId);
   btn.disabled = true;
@@ -9,7 +10,8 @@ async function museyReview(btn, postId, username, body) {
   try {
     const r = await fetch("/forum/musey-review", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json",
+                "X-CSRF-Token": CSRF_TOKEN},
       body: JSON.stringify({post_id: postId, username: username, body: body})
     });
     const d = await r.json();
