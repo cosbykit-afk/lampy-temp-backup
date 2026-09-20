@@ -299,9 +299,10 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   direct inspection 2026-09-20 ~05:20 PDT (all 6 resolve:
   james/james-server-jpa-guice, downloads/code-server-4.138.0-linux-amd64.tar.gz,
   lampy-single/apache2-lampy.conf, httpd/htdocs/, lampy-single/supervisord.conf,
-  lampy-single/pgai-worker.sh). No COPY/ADD-only docker build had completed in
-  evidence as of 05:12 PDT — the RUN-strip validation was defective (U-23);
-  clean re-run with corrected strip in progress, result pending.
+  lampy-single/pgai-worker.sh). The awk-stripped COPY/ADD-only docker build
+  COMPLETED exit 0 at 05:14:38 PDT (image df7e17b373c9, all 14 steps incl.
+  COPY --from=ollama-src, COPY james tree, ADD code-server tarball; temp image
+  removed after verification, reproducible on demand).
 - (U-23) RECORD CORRECTION (2026-09-20): the 2026-09-20 validation build made
   with `sed '/^RUN /d'` NEVER completed — it was SIGTERMed after ~16 min with
   zero output, and the method was broken regardless: it deleted only the first
@@ -310,7 +311,14 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   unparseable. Any "validation passed exit 0" claim for that run is
   unsupported; corrected strip (awk removes full RUN incl. continuations)
   re-running now. Lesson: never report a background build's result before its
-  exit status is observed.
+  exit status is observed. RESOLVED 2026-09-20 05:14:38 PDT: the corrected
+  awk-stripped validation build completed exit 0 — "Successfully built
+  df7e17b373c9", all 14 steps (COPY --from=ollama-src /usr/bin/ollama, COPY
+  james tree, ADD code-server tarball, 4 config COPYs, EXPOSE, CMD). Dockerfile
+  parses, every COPY/ADD source resolves in the build context, multi-stage
+  COPY --from works. Temp image removed after verification. Net: the sed-method
+  run never completed (killed, and unparseable anyway); the awk-method run
+  passed. Both statements are about different runs; the ledger now says so.
 - (U-24) FIXED (2026-09-20): build context was 4.8 GB even with .dockerignore
   (hidden_files/ already excluded) — `build/` (3.5G cargo/pgrx artifacts) and
   `ide/` (707M) were being sent to the daemon though neither Dockerfile
@@ -319,3 +327,8 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   tarball; compose builds ide/Dockerfile from the same root). Added both to
   .dockerignore; context now ~430MB. Same slimming benefits the real Windows
   build (build.sh sends the same root context).
+  PUSH PENDING 2026-09-20 ~05:25 PDT: commit e607a93 (this fix) is local-only;
+  `git push` to cosbykit-afk/lampy-temp-backup fails with proxy connection
+  resets (198.19.0.1:3128, exit 128) — network-level, not auth; earlier
+  2026-09-20 pushes succeeded. Retry at morning report; do NOT report remote
+  as updated until `git ls-remote` confirms e607a93.
