@@ -1,0 +1,15 @@
+build/
+downloads/
+james/
+ide/code-server-4.138.0-linux-amd64/
+ide/data/
+ide/server_smoke.log
+ollama-serve.log
+hidden_files/
+control-plane/demo_area/
+control-plane/logs/
+control-plane/trash/
+__pycache__/
+c-ide/__pycache__/
+c-ide/workspace/
+*.log

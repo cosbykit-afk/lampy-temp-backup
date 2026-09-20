@@ -1,0 +1,44 @@
+# DRAFT 2026-09-19 — pgvectorscale control manifest for the Lampy build.
+# Derived from Kit's 2025-02-23 sketch (per-component loop); valid TOML.
+
+[workspace]
+members = [
+    "alpine",
+    "bash",
+    "cargo",
+    "rust_compile",
+    "httpd",
+    "postgres",
+    "pgrx",
+    "timescaledb",
+    "timescaletools",
+    "pgvectorscale",
+    "pgai",
+    "ollama",
+    "pg_dump",
+    "pypip3",
+]
+
+[dependencies]
+# Valid ASSEMBLY
+# Valid OS
+system = [
+    "bash",
+    "cargo",
+    "rust_compile",
+    "postgres",
+    "gnupg",
+    "openssl-dev",
+    "postgresql-dev",
+]
+components = [
+    "pgrx",
+    "timescaledb",
+]
+
+[versions]
+postgres = "16"
+
+[env]
+PGRX_IGNORE_RUST_VERSIONS = "1"
+CARGO_TARGET_DIR          = "$WORK_DIR/tmp"

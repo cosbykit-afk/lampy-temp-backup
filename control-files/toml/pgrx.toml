@@ -1,0 +1,50 @@
+# DRAFT 2026-09-19 — pgrx control manifest for the Lampy build.
+# Derived from Kit's 2025-02-23 sketch; valid TOML (see ../README.md).
+# pgrx is the foundation: every other extension builds on it.
+
+[workspace]
+members = [
+    "alpine",
+    "bash",
+    "cargo",
+    "rust_compile",
+    "httpd",
+    "postgres",
+    "pgrx",
+    "timescaledb",
+    "timescaletools",
+    "pgvectorscale",
+    "pgai",
+    "ollama",
+    "pg_dump",
+    "pypip3",
+]
+
+[dependencies]
+# Valid ASSEMBLY
+# Valid OS
+# Postgres installation and dev tools
+system = [
+    "bash",
+    "cargo",
+    "rust_compile",
+    "postgres",
+    "gnupg",
+    "openssl-dev",
+    "postgresql-dev",
+]
+
+[versions]
+postgres      = "16"
+cargo_pgrx    = "0.19.2"
+rust_min      = "1.75"
+
+[env]
+# PGRX_BUILD_FLAGS=TRUE is Kit's tested Windows setting (kept in the sketch).
+# On the reference Linux host cargo-pgrx 0.19.2 misreads TRUE as a rustc
+# filename, so it is NOT set there. Retest only on the exact Windows/WSL2
+# toolchain before enabling it anywhere else.
+PGRX_BUILD_FLAGS_windows_only = "TRUE"
+PGRX_IGNORE_RUST_VERSIONS     = "1"   # reference host rustc 1.98.1 (env.sh)
+PGRX_HOME                     = "$ROOT/.pgrx"
+CARGO_TARGET_DIR              = "$WORK_DIR/tmp"

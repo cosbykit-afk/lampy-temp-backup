@@ -1,0 +1,113 @@
+# Lampy stack — DRAFT 2026-09-19
+#
+# Target service topology, derived from Kit's 2025-02-23 Docker sketch
+# (compose service map: httpd, postgres, pgrx, timescaledb, pgvectorscale,
+# pgai, timescaletools, ollama) and corrected for the sketch's defects:
+#   - every sketch service mapped ports 80:80/443:443 (impossible) -> one
+#     owner per port below
+#   - sketch pgrx service depended_on a nonexistent "cargo" service -> dropped
+#   - sketch embedded passwords (PG_PASS=password) -> deploy-time env only,
+#     never in this file
+#   - sketch "version: 0.0.5" -> removed (obsolete field)
+# Mapped onto 2026-09-19 decisions: httpd (not nginx), timescale/timescaledb-ha:pg16
+# as the database (postgres+timescaledb in one image), Apache James for mail,
+# Ollama for embeddings, code-server for the in-Docker IDE.
+# pgrx/pgvectorscale/pgai/timescaletools are BUILD-TIME (cargo pgrx) or
+# in-database extensions, not runtime services — see notes below.
+#
+# Deploy: set POSTGRES_PASSWORD and PASSWORD in the environment (or a .env
+# file — the Windows bootstrap writes one, see installer/bootstrap-paths.ps1),
+# then: docker compose up -d
+# Path stability (Kit 2026-09-19): PGDATA is the anchor. The db bind mount
+# uses ${PGDATA_DIR} and the other services' data dirs hang off the anchor's
+# tree via ${LAMPY_DATA} — moving the install only means re-pointing the
+# anchor; container-side paths never change.
+# (sandbox deviations: daemon needs --storage-driver=vfs --iptables=false
+# --bridge=none; see README.md)
+
+services:
+  httpd:
+    image: httpd:latest
+    container_name: lampy-httpd
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./httpd/htdocs:/usr/local/apache2/htdocs:ro
+
+  db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: lampy-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      # POSTGRES_PASSWORD comes from the environment at deploy time.
+    volumes:
+      # Anchor bind mount: PGDATA_DIR is the anchor chosen by
+      # installer/bootstrap-paths.ps1. On the reference host PGDATA_DIR is
+      # unset and this falls back to ./data/pgdata.
+      - ${PGDATA_DIR:-./data/pgdata}:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lampy-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Sibling of the anchor: LAMPY_DATA is the anchor's parent, written by
+      # installer/bootstrap-paths.ps1. (The Windows bootstrap also plants
+      # an NTFS junction at %USERPROFILE%\.ollama for native-Ollama use.)
+      - ${LAMPY_DATA:-.}/ollama:/root/.ollama
+
+  james:
+    image: apache/james:3.8.2
+    container_name: lampy-james
+    ports:
+      - "25:25"    # SMTP
+      - "587:587"  # submission
+      - "143:143"  # IMAP
+    volumes:
+      - james_data:/root
+
+  ide:
+    build:
+      context: .
+      dockerfile: ide/Dockerfile
+    container_name: lampy-ide
+    ports:
+      - "8080:8080"
+    environment:
+      # PASSWORD comes from the environment at deploy time.
+      - PASSWORD=${PASSWORD:?set PASSWORD at deploy time}
+    volumes:
+      - ./:/workspace:ro
+
+  pgai-worker:
+    # The pgai vectorizer worker: polls the database and calls Ollama.
+    # Sketch env carried over: PGAI_VECTORIZER_WORKER_DB_URL, OLLAMA_HOST.
+    # PENDING: pgai is not yet installed/verified (ModuleNotFoundError on the
+    # reference host 2026-09-19). This service is the target, not yet tested.
+    image: python:3.12-slim
+    container_name: lampy-pgai-worker
+    depends_on:
+      - db
+      - ollama
+    environment:
+      PGAI_VECTORIZER_WORKER_DB_URL: postgres://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD at deploy time}@db:5432/postgres
+      OLLAMA_HOST: http://ollama:11434
+    command: ["sh", "-c", "pip install pgai && python -m pgai vectorizer worker --poll-interval 30s --db-url $PGAI_VECTORIZER_WORKER_DB_URL"]
+
+volumes:
+  # james_data stays a named volume: it mounts over /root in the James
+  # image, and named volumes initialize from image content on first use —
+  # a host bind mount of an empty dir would hide the image's /root.
+  james_data:
+
+# NOT services (sketch had them as such; corrected per current decisions):
+# - pgrx: build tool (cargo pgrx), runs on the build host / builder container.
+# - pgvectorscale, pgai extension: installed INTO db via pgrx, not separate containers.
+# - timescaletools: unresolved what component this denotes (ledger U-8);
+#   no service until that is decided.
+# - alpine: the sketch's scaffold base service; not needed with real images.

@@ -1,0 +1,42 @@
+{
+  "workspace": {
+    "members": [
+      "alpine",
+      "bash",
+      "cargo",
+      "rust_compile",
+      "httpd",
+      "postgres",
+      "pgrx",
+      "timescaledb",
+      "timescaletools",
+      "pgvectorscale",
+      "pgai",
+      "ollama",
+      "pg_dump",
+      "pypip3"
+    ]
+  },
+  "dependencies": {
+    "system": [
+      "bash",
+      "cargo",
+      "rust_compile",
+      "postgres",
+      "gnupg",
+      "openssl-dev",
+      "postgresql-dev"
+    ]
+  },
+  "versions": {
+    "postgres": "16",
+    "cargo_pgrx": "0.19.2",
+    "rust_min": "1.75"
+  },
+  "env": {
+    "PGRX_BUILD_FLAGS_windows_only": "TRUE",
+    "PGRX_IGNORE_RUST_VERSIONS": "1",
+    "PGRX_HOME": "$ROOT/.pgrx",
+    "CARGO_TARGET_DIR": "$WORK_DIR/tmp"
+  }
+}

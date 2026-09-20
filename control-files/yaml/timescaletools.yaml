@@ -1,0 +1,34 @@
+# GENERATED from timescaletools.toml — do not edit; TOML is canonical.
+workspace:
+  members:
+  - alpine
+  - bash
+  - cargo
+  - rust_compile
+  - httpd
+  - postgres
+  - pgrx
+  - timescaledb
+  - timescaletools
+  - pgvectorscale
+  - pgai
+  - ollama
+  - pg_dump
+  - pypip3
+dependencies:
+  system:
+  - bash
+  - cargo
+  - rust_compile
+  - postgres
+  - gnupg
+  - openssl-dev
+  - postgresql-dev
+  components:
+  - pgrx
+  - timescaledb
+versions:
+  postgres: '16'
+env:
+  PGRX_IGNORE_RUST_VERSIONS: '1'
+  CARGO_TARGET_DIR: $WORK_DIR/tmp

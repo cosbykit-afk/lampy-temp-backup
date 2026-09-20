@@ -1,0 +1,53 @@
+# DRAFT 2026-09-19 — pgai control manifest for the Lampy build.
+# Derived from Kit's 2025-02-23 sketch; valid TOML (see ../README.md).
+# pgai sits at the top of the dependency chain: pgrx -> timescaledb ->
+# pgvectorscale -> pgai.
+
+[workspace]
+members = [
+    "alpine",
+    "bash",
+    "cargo",
+    "rust_compile",
+    "httpd",
+    "postgres",
+    "pgrx",
+    "timescaledb",
+    "timescaletools",
+    "pgvectorscale",
+    "pgai",
+    "ollama",
+    "pg_dump",
+    "pypip3",
+]
+
+[dependencies]
+# Valid ASSEMBLY
+# Valid OS
+# Postgres installation and dev tools
+system = [
+    "bash",
+    "cargo",
+    "rust_compile",
+    "postgres",
+    "gnupg",
+    "openssl-dev",
+    "postgresql-dev",
+]
+# pgai builds on the whole extension stack
+components = [
+    "pgrx",
+    "timescaledb",
+    "pgvectorscale",
+]
+
+[versions]
+postgres   = "16"
+cargo_pgrx = "0.19.2"
+# pgai vectorizer call pinned at bring-up against the installed release
+# (runbook procedure: CREATE EXTENSION ai CASCADE, then ai.create_vectorizer
+# with ai.embedding_ollama('nomic-embed-text', 768)).
+
+[env]
+PGRX_IGNORE_RUST_VERSIONS = "1"
+CARGO_TARGET_DIR          = "$WORK_DIR/tmp"
