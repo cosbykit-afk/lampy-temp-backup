@@ -1,0 +1,9 @@
+# Keep the build context small: the daemon only needs Dockerfiles,
+# config, htdocs, the james tree, and the code-server tarball.
+hidden_files/
+backups/
+downloads/james.zip
+.git/
+c-ide/workspace/
+control-plane/
+*.log
