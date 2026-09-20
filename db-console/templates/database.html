@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Database — Lampy Console{% endblock %}
+{% block content %}
+<div class="dbwrap">
+  <h1 class="search-h">Forum database</h1>
+
+  <div class="dbcard {{ 'ok' if reachable else 'pending' }}">
+    <div class="dbstatus">{{ '● Reachable' if reachable else '○ Not yet provisioned' }}</div>
+    <table class="dbtable">
+      <tr><th>Host</th><td>{{ host }}</td></tr>
+      <tr><th>Port</th><td>{{ port }}</td></tr>
+      <tr><th>Database</th><td>{{ dbname }}</td></tr>
+      <tr><th>User</th><td>{{ user }}</td></tr>
+    </table>
+    {% if not reachable %}
+    <p class="dbnote">
+      The database comes up at Windows bring-up (~Sept&nbsp;23): Docker Desktop
+      with <code>timescale/timescaledb-ha:pg16</code>, then
+      <code>forum/schema.sql</code> is applied. This page will switch to the
+      live interface automatically once the port answers.
+      {% if err %}<br><span class="dberr">Last probe: {{ err }}</span>{% endif %}
+    </p>
+    {% else %}
+    <p class="dbnote">Port {{ port }} answers. Table browser, row counts, and
+    the query runner land here next — read-only until an admin signs in.</p>
+    {% endif %}
+  </div>
+
+  <h2 class="db-h2">Coming at bring-up</h2>
+  <ul class="dbtodo">
+    <li>Table browser — <code>users</code>, <code>forum_events</code>, and the schema in <code>forum/schema.sql</code></li>
+    <li>Musey admin account check — <code>musey@lampy.local</code>, <code>is_admin = TRUE</code></li>
+    <li>pgAI / vectorizer status and embedding-path verification</li>
+    <li>Read-only query runner (parameterized, row-limited)</li>
+  </ul>
+</div>
+{% endblock %}

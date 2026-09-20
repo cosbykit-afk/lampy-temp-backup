@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if q %}“{{ q }}” — {% endif %}Search — Lampy Console{% endblock %}
+{% block content %}
+<div class="searchwrap">
+  {% if notice %}
+  <p class="notice">{{ notice }}</p>
+  {% endif %}
+  {% if q %}
+  <h1 class="search-h">Results for “{{ q }}”</h1>
+  {% if results %}
+  <p class="search-meta">{{ results | length }} page{{ 's' if results | length != 1 else '' }} matched</p>
+  <ul class="results">
+    {% for pg, snip in results %}
+    <li class="result">
+      <a class="result-title" href="/page/{{ pg.slug }}">{{ pg.title }}</a>
+      <div class="result-url">lampy.console › {{ pg.slug }}</div>
+      <p class="result-snip">{{ snip | safe }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="notice">No pages matched. Try fewer or different words.</p>
+  {% endif %}
+  {% else %}
+  <h1 class="search-h">Search the docs</h1>
+  <p class="notice">Type in the search box above — it matches titles, headings, and page text across the whole series.</p>
+  {% endif %}
+</div>
+{% endblock %}

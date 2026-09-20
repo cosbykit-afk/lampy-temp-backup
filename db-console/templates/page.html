@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} — Lampy Console{% endblock %}
+{% block head_extra %}
+<style>{{ page.css }}</style>
+{% endblock %}
+{% block content %}
+<div class="rtheory-doc">{{ page.body | safe }}</div>
+{% endblock %}
+{% block toc %}
+<aside class="tocnav" aria-label="On this page">
+  <div class="tochead">On this page</div>
+  <ul class="toclist">
+    {% for level, hid, text in page.headings %}
+    <li class="toc-l{{ level }}"><a href="#{{ hid }}">{{ text }}</a></li>
+    {% endfor %}
+  </ul>
+</aside>
+{% endblock %}
