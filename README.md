@@ -29,7 +29,7 @@ A self-hosted discussion-forum stack ("LAMP"-style, Python variant):
 | Layer | Component | Role |
 |---|---|---|
 | OS | Linux (Ubuntu 24.04 LTS, reference host) | base |
-| Mail | Apache James 3.8.2 (JPA/Guice) | SMTP/IMAP mail server for forum notifications |
+| Mail | ~~Apache James 3.8.2 (JPA/Guice)~~ — REMOVED 2026-09-19 per Kit; httpd serves web + mail | mail server for forum notifications (implementation open) |
 | Database | PostgreSQL 16 + TimescaleDB + pgvector/pgvectorscale + pgAI — in a Docker Desktop Linux container on Windows in production (§3.6); on Linux in the reference build (§8) | forum data, time-series metrics, scalable vector search, AI semantic search |
 | Extensions SDK | pgrx (Rust) | toolchain for building custom PostgreSQL extensions |
 | App | Python 3.12 + Flask (`~/workspace/forum/`) | the forum web application |
@@ -41,8 +41,10 @@ A self-hosted discussion-forum stack ("LAMP"-style, Python variant):
 > **Design decision (Kit 2026-09-19):** Apache HTTPD is the web server / TLS
 > terminator (replaces nginx; fits the "Lampy"/LAMP naming). Kit's own 2025-02-23
 > Docker sketch (his Facebook "Docker progress" post) already specified an
-> `httpd` service — this decision matches his original design. Apache James
-> remains the mail server — a separate component, not the web server.
+> `httpd` service — this decision matches his original design. 2026-09-19 evening,
+> Kit removed Apache James: httpd serves both web and mail; no separate mail
+> component. (Open: how the mail side is implemented on httpd — stock httpd has
+> no SMTP/IMAP; to be decided.)
 
 Text architecture:
 
@@ -54,9 +56,9 @@ Text architecture:
                                               │     ├─ forum tables
                                               │     ├─ TimescaleDB hypertable (metrics)
                                               │     └─ pgAI vectorizer (semantic search)
-                                              └─► James SMTP :25/587 (outbound mail)
+                                              └─► HTTPD mail :25/587 (outbound mail)
                                                         │
-  mailboxes ◄──IMAP :993── Apache James ◄── local delivery
+  mailboxes ◄──IMAP :993── HTTPD mail ◄── local delivery
 ```
 
 Port table (production defaults; build-host deviations noted in §8):
@@ -65,9 +67,9 @@ Port table (production defaults; build-host deviations noted in §8):
 |---|---|---|
 | 80/443 | Apache HTTPD (forum site) | internet |
 | 5432 | PostgreSQL | app host only (never internet) |
-| 25 | James SMTP (MX + relay) | internet (25) / app (587 submission) |
-| 587 | James SMTP submission | app host / authenticated users |
-| 143/993 | James IMAP | users (993 preferred) |
+| 25 | HTTPD mail SMTP (MX + relay) | internet (25) / app (587 submission) |
+| 587 | HTTPD mail SMTP submission | app host / authenticated users |
+| 143/993 | HTTPD mail IMAP | users (993 preferred) |
 | 8000 | gunicorn | localhost only (behind Apache HTTPD) |
 
 ## 2. Prerequisites
@@ -387,7 +389,7 @@ cargo pgrx install --release   # installs into the local PostgreSQL
 
 Then `CREATE EXTENSION forum_ext;` in psql.
 
-## 6. Apache James 3.8.2 (mail server) [in progress]
+## 6. Apache James 3.8.2 (mail server) [REMOVED 2026-09-19 per Kit — httpd serves web + mail; section retained for history]
 
 ### 6.1 Install
 

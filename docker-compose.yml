@@ -10,8 +10,9 @@
 #     never in this file
 #   - sketch "version: 0.0.5" -> removed (obsolete field)
 # Mapped onto 2026-09-19 decisions: httpd (not nginx), timescale/timescaledb-ha:pg16
-# as the database (postgres+timescaledb in one image), Apache James for mail,
-# Ollama for embeddings, code-server for the in-Docker IDE.
+# as the database (postgres+timescaledb in one image), Ollama for embeddings,
+# code-server for the in-Docker IDE. 2026-09-19 evening, Kit: James REMOVED —
+# httpd serves web + mail; no separate mail service.
 # pgrx/pgvectorscale/pgai/timescaletools are BUILD-TIME (cargo pgrx) or
 # in-database extensions, not runtime services — see notes below.
 #
@@ -61,16 +62,6 @@ services:
       # an NTFS junction at %USERPROFILE%\.ollama for native-Ollama use.)
       - ${LAMPY_DATA:-.}/ollama:/root/.ollama
 
-  james:
-    image: apache/james:3.8.2
-    container_name: lampy-james
-    ports:
-      - "25:25"    # SMTP
-      - "587:587"  # submission
-      - "143:143"  # IMAP
-    volumes:
-      - james_data:/root
-
   ide:
     build:
       context: .
@@ -99,11 +90,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
     command: ["sh", "-c", "pip install pgai && python -m pgai vectorizer worker --poll-interval 30s --db-url $PGAI_VECTORIZER_WORKER_DB_URL"]
 
-volumes:
-  # james_data stays a named volume: it mounts over /root in the James
-  # image, and named volumes initialize from image content on first use —
-  # a host bind mount of an empty dir would hide the image's /root.
-  james_data:
+# (no top-level volumes block: james_data removed with the James service 2026-09-19)
 
 # NOT services (sketch had them as such; corrected per current decisions):
 # - pgrx: build tool (cargo pgrx), runs on the build host / builder container.

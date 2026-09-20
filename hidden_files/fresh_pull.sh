@@ -6,7 +6,6 @@ LOG=~/workspace/forum-stack/hidden_files/docker_pulls_fresh_2026-09-19.log
 IMAGES=(
   "timescale/timescaledb-ha:pg16"
   "ollama/ollama:latest"
-  "apache/james:3.8.2"
   "python:3.12-slim"
   "httpd:latest"
 )
@@ -23,11 +22,6 @@ for img in "${IMAGES[@]}"; do
     sleep 60
   done
 done
-# james fallback: only if 3.8.2 definitively absent
-if ! docker images --format '{{.Repository}}:{{.Tag}}' | grep -q '^apache/james:3.8.2$'; then
-  echo "[$(date -u '+%F %T UTC')] james:3.8.2 absent — trying apache/james:latest fallback"
-  docker pull "apache/james:latest" 2>&1 | tail -2
-fi
 echo "[$(date -u '+%F %T UTC')] pull run finished"
 docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}'
 } >> "$LOG" 2>&1

@@ -241,3 +241,30 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   the Python control plane. Day's arc: 06:34 unmounted-root insight + OS sketch
   -> 07:10 venv automation w/ mount guards -> 10:56 Python-C compilation
   research (ancestor of c-ide).
+
+## New issues (2026-09-19)
+- (U-20): `apache/james:3.8.2` does not exist on Docker Hub — the repo carries
+  only variant-prefixed tags (`demo-3.8.2`, `cassandra-3.8.2`, `distributed-3.8.2`,
+  …; 77 tags, no plain `3.8.2`; "manifest unknown" is definitive, not flaky).
+  `demo-3.8.2` (531MB) was pulled to hold the pinned version. `docker-compose.yml`
+  still references the nonexistent `apache/james:3.8.2`; left unchanged pending
+  Kit's Apache clarification (whether James stays in the stack at all).
+- Docker 29.8.1 reinstalled durably: static binaries at ~/docker/docker/,
+  symlinked into ~/bin/ (survive VM resets), daemon running
+  (--storage-driver=vfs --iptables=false --bridge=none). Images verified via
+  `docker images`: timescale/timescaledb-ha:pg16 (3.28GB), ollama/ollama:latest
+  (5.46GB), apache/james:demo-3.8.2 (531MB), python:3.12-slim (119MB),
+  httpd:latest (117MB). Docker-install backup tarball at
+  backups/docker-install-backup-2026-09-19.tar.gz (86MB; already in the GitHub
+  backup push, remote SHA verified).
+- DECISION (Kit 2026-09-19 evening): Apache James REMOVED from the stack —
+  httpd serves both web and mail; no separate mail service. compose `james`
+  service + `james_data` volume deleted; pull scripts de-jamesed;
+  `james/` (99MB) and `downloads/james.zip` moved to recoverable trash.
+  README §6 marked REMOVED (retained for history); WORKFLOW acceptance
+  criteria reworded to the mail side generically.
+- (U-21) OPEN: how the mail side is implemented on httpd. Stock Apache HTTPD
+  has no SMTP/IMAP of its own; the mechanism (module, CGI/app-level relay,
+  external MTA behind httpd) is undecided. Closes when the mail path is
+  specified and the acceptance "mail banner + delivered test mail" has a
+  concrete target.
