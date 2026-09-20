@@ -314,3 +314,12 @@ status. A fix that unblocks new work is noted as such.
   (lampy-single/Dockerfile). No other RUN uses dpkg, so no other step needs it.
 - Retrying the cloud build; earlier steps (base pulls, ollama COPY) should hit
   the cloud builder cache.
+
+## 2026-09-20 ~07:40 PDT — cloud build failed at pip install: --break-system-packages unknown (FIXED)
+- After the man1 fix, build reached [stage-2 3/12] and failed, exit code 2:
+  `pip install --no-cache-dir --break-system-packages pgai` ->
+  `no such option: --break-system-packages`.
+- Observed root cause: the base is Ubuntu jammy, pip 22.0.2+dfsg-1ubuntu0.7;
+  the flag (and EXTERNALLY-MANAGED enforcement) arrived in pip 23. Plain
+  `pip install --no-cache-dir pgai` is correct here. Comment added to the
+  Dockerfile explaining why the flag is absent.
