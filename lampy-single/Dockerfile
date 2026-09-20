@@ -36,10 +36,12 @@
 #   - pgai/pgvectorscale extensions in the DB need the pgrx build (not in image).
 #   - xapp (forum app) for the /app reverse proxy is not in the image yet.
 
-FROM timescale/timescaledb-ha:pg16 AS base
+# Pinned by digest 2026-09-20 for reproducible builds (see pressure-test.sh
+# phase 6). Re-pin deliberately when moving to a newer base.
+FROM timescale/timescaledb-ha:pg16@sha256:4f288c0a521362cad799f265bc0ebd60c3f8f98596b850172cc2da72883420ff AS base
 
 # Ollama binary donor stage (verified path /usr/bin/ollama in image layers).
-FROM ollama/ollama:latest AS ollama-src
+FROM ollama/ollama:latest@sha256:da6e0dc5651df159e45686fd663c4dbe1624a52c44d7280eeac1551d8f865532 AS ollama-src
 
 FROM base
 USER root
@@ -78,7 +80,8 @@ RUN a2dissite 000-default && a2ensite lampy && a2enmod proxy proxy_http
 COPY lampy-single/supervisord.conf /etc/supervisor/conf.d/lampy.conf
 COPY lampy-single/pgai-worker.sh /usr/local/bin/pgai-worker.sh
 RUN chmod +x /usr/local/bin/pgai-worker.sh \
-    && mkdir -p /var/log/supervisor /var/run/supervisor
+    && mkdir -p /var/log/supervisor /var/run/supervisor \
+    && rm -rf /tmp/hsperfdata_root
 
 EXPOSE 80 443 5432 11434 8080 2525 2465 2587 1143 1993 1110
 CMD ["supervisord", "-n", "-c", "/etc/supervisor/conf.d/lampy.conf"]
