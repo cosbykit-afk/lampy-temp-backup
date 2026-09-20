@@ -381,12 +381,13 @@ python3 installer/seed-musey-admin.py
 ```
 
 It creates user `musey` (`musey@lampy.local`) with `is_admin = TRUE` and a
-werkzeug hash exactly as `/register` would store it. The password is a
-fresh 32-character random value printed **once** to the operator's console
-for recording — never written to disk or logged. To choose the password
-yourself instead, set `MUSEY_PASSWORD` in the environment. `--dry-run`
-validates without touching the database; `--reset-password` re-issues the
-password on an existing account.
+werkzeug hash exactly as `/register` would store it. The password defaults
+to the literal string `password` — this is a generic distributable image,
+so the seed uses a well-known default. **Change it immediately after first
+login** (forum account settings, or rerun the script with `--reset-password`
+and `MUSEY_PASSWORD`). To choose the password at seed time instead, set
+`MUSEY_PASSWORD` in the environment. `--dry-run` validates without touching
+the database; `--reset-password` re-issues the password on an existing account.
 
 ## 5. pgrx toolchain (Rust → PostgreSQL extensions) [in progress]
 

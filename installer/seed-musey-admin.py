@@ -7,8 +7,10 @@ is left alone unless --reset-password is passed.
 
 Password handling — read carefully:
   * If MUSEY_PASSWORD is set in the environment, that password is used.
-  * Otherwise a 32-character random password is generated and printed ONCE
-    to stdout for the operator to record (password manager, vault, etc.).
+  * Otherwise the default password is the literal string "password".
+  * This is a generic distributable image, so the seed uses a well-known
+    default. Change it immediately after first login (forum account
+    settings, or rerun with --reset-password and MUSEY_PASSWORD).
   * The plaintext password is never written to disk, never logged, and never
     stored anywhere by this script. Only the werkzeug hash goes into the
     database, exactly as the forum's own /register route would store it.
@@ -32,8 +34,6 @@ run if the users table is missing), and psycopg (v3) + werkzeug installed.
 import argparse
 import os
 import re
-import secrets
-import string
 import sys
 
 # Same validation the forum app enforces (app.py USERNAME_RE/EMAIL_RE).
@@ -42,6 +42,10 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 MUSEY_USERNAME = "musey"
 MUSEY_EMAIL = "musey@lampy.local"
+
+# Generic-image default: a well-known password the operator changes after
+# first login. Overridable with MUSEY_PASSWORD at seed time.
+DEFAULT_PASSWORD = "password"
 
 
 def db_kwargs():
@@ -52,11 +56,6 @@ def db_kwargs():
         "user": os.environ.get("FORUM_DB_USER", "forum"),
         "password": os.environ.get("FORUM_DB_PASS", "forum_dev_only"),
     }
-
-
-def new_password():
-    alphabet = string.ascii_letters + string.digits + "-_"
-    return "".join(secrets.choice(alphabet) for _ in range(32))
 
 
 def main():
@@ -73,7 +72,7 @@ def main():
     from werkzeug.security import check_password_hash, generate_password_hash
 
     supplied = os.environ.get("MUSEY_PASSWORD", "")
-    password = supplied if supplied else new_password()
+    password = supplied if supplied else DEFAULT_PASSWORD
     if len(password) < 8:
         sys.exit("FATAL: MUSEY_PASSWORD must be at least 8 characters")
     pw_hash = generate_password_hash(password)
@@ -84,7 +83,8 @@ def main():
         print("dry-run: would upsert user "
               f"username={MUSEY_USERNAME} email={MUSEY_EMAIL} is_admin=TRUE")
         print("dry-run: password source = "
-              + ("MUSEY_PASSWORD (operator-chosen)" if supplied else "generated"))
+              + ("MUSEY_PASSWORD (operator-chosen)" if supplied
+                 else 'default literal "password" (change after first login)'))
         print("dry-run: hash verified to round-trip; no database touched")
         return 0
 
@@ -151,12 +151,11 @@ def main():
           f"is_admin={is_admin} ({'created' if created else 'already existed'})")
     if created or args.reset_password:
         print()
-        print("=" * 64)
-        print("MUSEY'S FORUM PASSWORD — RECORD IT NOW. It is shown once and")
-        print("is not stored anywhere by this script.")
-        print("=" * 64)
-        print(password)
-        print("=" * 64)
+        if supplied:
+            print("Password set from MUSEY_PASSWORD (operator-chosen).")
+        else:
+            print('Musey password is the default literal string: password')
+            print("Change it immediately after first login.")
     return 0
 
 
