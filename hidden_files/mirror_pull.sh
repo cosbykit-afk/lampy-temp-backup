@@ -12,7 +12,7 @@ mirror_for() {
     *) echo "mirror.gcr.io/$1" ;;
   esac
 }
-for img in timescale/timescaledb-ha:pg16 ollama/ollama:latest nginx:latest python:3.12-slim; do
+for img in timescale/timescaledb-ha:pg16 ollama/ollama:latest apache/james:demo-3.8.2 nginx:latest python:3.12-slim; do
   if have "$img"; then echo "HAVE $img -- skipping"; continue; fi
   m="$(mirror_for "$img")"
   ok=0

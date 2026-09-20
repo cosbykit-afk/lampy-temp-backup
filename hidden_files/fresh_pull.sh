@@ -6,6 +6,7 @@ LOG=~/workspace/forum-stack/hidden_files/docker_pulls_fresh_2026-09-19.log
 IMAGES=(
   "timescale/timescaledb-ha:pg16"
   "ollama/ollama:latest"
+  "apache/james:demo-3.8.2"
   "python:3.12-slim"
   "httpd:latest"
 )

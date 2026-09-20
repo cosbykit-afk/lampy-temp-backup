@@ -92,9 +92,10 @@ called done.
 Stack components, topology, and decisions recorded: Python/Flask forum,
 PostgreSQL 16, TimescaleDB, pgvector, pgvectorscale, pgAI + vectorizer
 worker, Ollama (`nomic-embed-text`, 768-dim), pgrx/Rust tooling,
-Apache HTTPD/gunicorn (web + mail — James removed 2026-09-19 per Kit). Production topology (2026-09-19, Kit): **Windows-only first build — no WSL2
+Apache James 3.8.2 (`apache/james:demo-3.8.2`, Kit's port remap),
+Apache HTTPD/gunicorn. Production topology (2026-09-19, Kit): **Windows-only first build — no WSL2
 Ubuntu.** Docker Desktop on Windows runs the Linux container images (db,
-httpd, ollama, ide, pgai-worker per `docker-compose.yml`); Docker
+httpd, ollama, james, ide, pgai-worker per `docker-compose.yml`); Docker
 Desktop's internal WSL2 backend is Docker's own machinery, not a Ubuntu
 environment we manage. The earlier Windows+WSL2 split (runbook §3.6) is
 superseded for the first build and retained for reference only.
@@ -122,7 +123,7 @@ register → login → thread → reply, templates render. **Not yet run.**
 Install the stack in dependency order (§4), one component per build-debug
 cycle (§5): base packages → Rust → cargo-pgrx → Java → PostgreSQL 16 +
 TimescaleDB + pgvector + pgvectorscale + pgAI → Ollama →
-vectorizer worker → schema → mail (httpd) → Apache HTTPD/gunicorn wiring.
+vectorizer worker → schema → Apache James (mail) → Apache HTTPD/gunicorn wiring.
 
 Reference host (this machine) prototypes everything all-Linux first; the
 first build targets native Windows (Docker Desktop, no WSL2 Ubuntu distro)
@@ -162,7 +163,7 @@ Rules:
    root cause traces to a lower layer, that layer's build-debug cycle (§5)
    reopens — the upper layer does not get a workaround that hides it.
 3. **Versions are pinned at bring-up.** The pgAI vectorizer call, the
-   TimescaleDB image tag, the mail implementation — each is pinned to the
+   TimescaleDB image tag, the James port remap — each is pinned to the
    exact release verified, and the pin is recorded in the runbook.
 
 ## 5. Build-debug-verify cycles
@@ -180,10 +181,10 @@ install → smoke test → integration test → [bug?] → debug loop → re-ver
 1. **Install** per the runbook, with `env.sh` sourced. Record the exact
    version installed (e.g. cargo-pgrx 0.19.2, 2026-09-19).
 2. **Smoke test** — the component's own minimal proof of life (e.g.
-   `cargo pgrx --version`, `ollama --version`, mail banner on the
-   test port, `SELECT * FROM timescaledb_information.hypertables`).
+   `cargo pgrx --version`, `ollama --version`, James SMTP banner on the
+   test port (2525), `SELECT * FROM timescaledb_information.hypertables`).
 3. **Integration test** — the component doing its real job inside the
-   stack (e.g. vectorizer worker embeds a new post; the mail side delivers a
+   stack (e.g. vectorizer worker embeds a new post; James delivers a
    reply-notification email; `/metrics` reads the hypertable).
 4. **Debug loop** (only if 2 or 3 fails): reproduce → isolate → minimal
    fix → re-run the failing test → regression-check the tests that passed
@@ -251,7 +252,7 @@ The acceptance gate is the runbook §9 checklist: extensions present
 (`\dx` shows `timescaledb`, `vector`, `vectorscale`, `ai`), hypertable
 listed, vectorizer worker running with a DiskANN index and relevant
 semantic results, `cargo pgrx test` green on the template extension,
-mail banner + delivered test mail, full forum flow
+James SMTP banner (2525) + delivered test mail, full forum flow
 (register → thread → reply → notification email), `/metrics` reading the
 hypertable, no admin ports internet-reachable, backups configured and
 restore-tested.
@@ -300,9 +301,9 @@ document"). Status labels per §6. A task leaves this list only when its
 evidence is recorded in runbook §8.
 
 ### Docker / images
-- [ ] All four images in `docker images`: `timescale/timescaledb-ha:pg16`,
-  `ollama/ollama:latest`, `python:3.12-slim`,
-  `httpd:latest`. [done 2026-09-19] (James removed from the stack 2026-09-19 per Kit.)
+- [ ] All five images in `docker images`: `timescale/timescaledb-ha:pg16`,
+  `ollama/ollama:latest`, `apache/james:demo-3.8.2`, `python:3.12-slim`,
+  `httpd:latest`. [done 2026-09-19] (James re-added to the stack 2026-09-19 evening per Kit.)
 - [ ] `httpd -t` syntax check on `httpd/httpd.conf` once the httpd image lands. [pending]
 - [ ] Real container start verified (vfs, no bridge, `--network host`). [pending]
 - [ ] Docker socket mount vs real `docker:dind` — decision needed (ledger U-10)

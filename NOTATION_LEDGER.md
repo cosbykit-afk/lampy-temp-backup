@@ -268,3 +268,15 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   external MTA behind httpd) is undecided. Closes when the mail path is
   specified and the acceptance "mail banner + delivered test mail" has a
   concrete target.
+- (U-20 follow-up, Kit 2026-09-19 evening): James files restored from trash
+  (both entries, originals back in place). Diff vs pristine zip shows Kit's
+  SMTP setup was port remapping ONLY: SMTP 25->2525, SMTPS 465->2465,
+  submission 587->2587, IMAP 143->1143, IMAPS 993->1993, POP3 110->1110.
+  All other settings (auth, authorizedAddresses 127.0.0.0/8, DB) are stock.
+  Service still out of docker-compose.yml pending Kit's decision.
+- DECISION REVERSED (Kit 2026-09-19 ~21:28 PT): James RE-ADDED as the mail
+  server. compose `james` service restored: image `apache/james:demo-3.8.2`
+  (3.8.2 via the demo variant tag; `apache/james:3.8.2` does not exist —
+  see U-20), Kit's port remap published (2525/2465/2587/1143/1993/1110),
+  `james_data` named volume back. Pull scripts re-jamesed. U-21 CLOSED:
+  mail = James; the httpd-does-mail question is moot.
