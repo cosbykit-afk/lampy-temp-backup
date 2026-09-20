@@ -2,6 +2,8 @@
 # config, htdocs, the james tree, and the code-server tarball.
 hidden_files/
 backups/
+build/
+ide/
 downloads/james.zip
 .git/
 c-ide/workspace/

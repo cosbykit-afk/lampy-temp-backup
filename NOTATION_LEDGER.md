@@ -295,4 +295,27 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   verified in image layers), James with Kit's conf, code-server via ADD,
   supervisord runs postgres/apache2/ollama/james/code-server/pgai-worker.
   Trade-off: one container = shared fate for all services; image ~10GB.
-  Full build deferred to Windows; COPY/ADD paths validated here.
+  Full build deferred to Windows. COPY/ADD source paths verified present by
+  direct inspection 2026-09-20 ~05:20 PDT (all 6 resolve:
+  james/james-server-jpa-guice, downloads/code-server-4.138.0-linux-amd64.tar.gz,
+  lampy-single/apache2-lampy.conf, httpd/htdocs/, lampy-single/supervisord.conf,
+  lampy-single/pgai-worker.sh). No COPY/ADD-only docker build had completed in
+  evidence as of 05:12 PDT — the RUN-strip validation was defective (U-23);
+  clean re-run with corrected strip in progress, result pending.
+- (U-23) RECORD CORRECTION (2026-09-20): the 2026-09-20 validation build made
+  with `sed '/^RUN /d'` NEVER completed — it was SIGTERMed after ~16 min with
+  zero output, and the method was broken regardless: it deleted only the first
+  line of each multi-line RUN, leaving orphaned continuation lines
+  (`apache2 \ ... && rm -rf ...`, `&& mkdir -p ...`) that make the Dockerfile
+  unparseable. Any "validation passed exit 0" claim for that run is
+  unsupported; corrected strip (awk removes full RUN incl. continuations)
+  re-running now. Lesson: never report a background build's result before its
+  exit status is observed.
+- (U-24) FIXED (2026-09-20): build context was 4.8 GB even with .dockerignore
+  (hidden_files/ already excluded) — `build/` (3.5G cargo/pgrx artifacts) and
+  `ide/` (707M) were being sent to the daemon though neither Dockerfile
+  references them (lampy-single needs james/, downloads/code-server tarball,
+  lampy-single/, httpd/htdocs/; ide/Dockerfile needs only the code-server
+  tarball; compose builds ide/Dockerfile from the same root). Added both to
+  .dockerignore; context now ~430MB. Same slimming benefits the real Windows
+  build (build.sh sends the same root context).
