@@ -300,3 +300,17 @@ status. A fix that unblocks new work is noted as such.
   expectations). `cargo new/build/run` hello-world prints OK — rustc -> cc
   link chain works. env.sh already puts $CARGO_HOME/bin on PATH (lines 12-14);
   no edit needed. Verified through `source env.sh`.
+
+## 2026-09-20 ~07:39 PDT — cloud build failed at apt-get: missing /usr/share/man/man1 (FIXED)
+- First full `lampy-single` Build Cloud build failed at [stage-2 2/12]
+  (Dockerfile:50), exit code 100. Observed root cause, not a guess:
+  `update-alternatives: error: error creating symbolic link
+  '/usr/share/man/man1/java.1.gz.dpkg-tmp': No such file or directory`
+  during openjdk-17-jre-headless postinst -> dpkg error -> apt exit 100.
+- The timescale/timescaledb-ha:pg16 base strips man pages, so the directory
+  does not exist; java's update-alternatives needs it. ca-certificates-java
+  failed only as a dependency consequence.
+- Fix: `mkdir -p /usr/share/man/man1` at the start of the same RUN
+  (lampy-single/Dockerfile). No other RUN uses dpkg, so no other step needs it.
+- Retrying the cloud build; earlier steps (base pulls, ollama COPY) should hit
+  the cloud builder cache.

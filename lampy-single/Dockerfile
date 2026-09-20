@@ -47,7 +47,8 @@ ENTRYPOINT []
 
 COPY --from=ollama-src /usr/bin/ollama /usr/bin/ollama
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN mkdir -p /usr/share/man/man1 \
+    && apt-get update && apt-get install -y --no-install-recommends \
       apache2 \
       python3 python3-pip \
       openjdk-17-jre-headless \
