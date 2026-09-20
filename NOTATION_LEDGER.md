@@ -280,3 +280,19 @@ tested Windows configuration (2025-02-26 post, confirmed correct by Kit
   see U-20), Kit's port remap published (2525/2465/2587/1143/1993/1110),
   `james_data` named volume back. Pull scripts re-jamesed. U-21 CLOSED:
   mail = James; the httpd-does-mail question is moot.
+- (U-22) ENVIRONMENT LIMITATION (2026-09-20): `docker run` is BLOCKED in the
+  Linux reference sandbox — runc fails with "setns: operation not permitted"
+  (mount namespace), even as root and even with --privileged/--userns=host.
+  `docker build` RUN steps hang/fail for the same reason (ide image build
+  killed after hanging on its RUN tar step). What works here: pull, images,
+  COPY/ADD-only builds. Stack launch (`compose up`) and any RUN-step build
+  MUST happen on Windows Docker Desktop (~2026-09-23). Daemon itself runs
+  fine (29.8.1, vfs/iptables=false/bridge=none); all 5 pulled images intact.
+- DECISION (Kit 2026-09-20): single consolidated image. Design at
+  lampy-single/: base timescale/timescaledb-ha:pg16 (USER root + ENTRYPOINT []
+  reset — base sets USER postgres), Debian apache2 + python3 + openjdk-17 +
+  supervisor via apt, ollama binary COPY --from ollama/ollama (/usr/bin/ollama
+  verified in image layers), James with Kit's conf, code-server via ADD,
+  supervisord runs postgres/apache2/ollama/james/code-server/pgai-worker.
+  Trade-off: one container = shared fate for all services; image ~10GB.
+  Full build deferred to Windows; COPY/ADD paths validated here.
