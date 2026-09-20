@@ -48,6 +48,9 @@ USER root
 ENTRYPOINT []
 
 COPY --from=ollama-src /usr/bin/ollama /usr/bin/ollama
+# The CLI alone cannot serve: it execs the llama-server runner from
+# /usr/lib/ollama. Without this, `ollama serve` fails at startup.
+COPY --from=ollama-src /usr/lib/ollama /usr/lib/ollama
 
 RUN mkdir -p /usr/share/man/man1 \
     && apt-get update && apt-get install -y --no-install-recommends \

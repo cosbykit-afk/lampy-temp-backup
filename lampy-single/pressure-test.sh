@@ -137,6 +137,9 @@ chk() {
 }
 
 chk /usr/bin/ollama x
+# The CLI execs its runner from /usr/lib/ollama; without it `ollama serve`
+# fails at startup (real bug found 2026-09-20 via chroot inference test).
+chk /usr/lib/ollama/llama-server x
 chk /usr/lib/jvm/java-17-openjdk-amd64/bin/java x
 chk /opt/james/james-server-jpa-guice d
 chk /opt/code-server l
