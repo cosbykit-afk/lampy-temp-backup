@@ -42,3 +42,8 @@ docker buildx build \
   -t kitcosby/lampy-single:latest \
   --push \
   .
+# Terminal record (notation contract, WORKFLOW.md §6.1). With `set -e`,
+# reaching here means the push succeeded; the digest line is informational
+# (`|| true`: an inspect failure must not fail a successful push).
+DIGEST="$(docker buildx imagetools inspect kitcosby/lampy-single:latest 2>/dev/null | grep -m1 '^Digest:' || true)"
+printf 'RESULT\tOK\timage pushed\tkitcosby/lampy-single:latest\t%s\n' "${DIGEST:-digest-unknown}"

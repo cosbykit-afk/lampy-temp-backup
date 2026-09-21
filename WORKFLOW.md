@@ -246,6 +246,28 @@ Runbook §8 is the state of record. Every component carries exactly one:
 Nothing is called "operational", "done", or "working" until it is
 [verified]. The Flask app is not operational; the stack is not operational.
 
+### 6.1 Notation contract (workflow scripts)
+
+Every workflow script that runs checks follows the same result notation,
+so runs are greppable and diffable across machines and dates:
+
+- One `RESULT<TAB><PASS|FAIL|SKIP><TAB><check name><TAB><reason>` record
+  per check. Check names are single-line and tab-free; the reason field
+  may be empty.
+- One `SUMMARY<TAB>pass=N<TAB>fail=M<TAB>skip=K` line at the end of the run.
+- Exit codes: `0` = clean (no FAIL), `1` = at least one FAIL,
+  `2` = the harness itself is broken (missing tool, bad usage).
+- `set -o pipefail` (bash) wherever a pipeline feeds a pass/fail decision —
+  a failure anywhere in the pipe fails the check; pipes must never mask
+  exit codes.
+- Build/push scripts end with one `RESULT<TAB>OK<TAB>...` terminal record;
+  under `set -e`, reaching it means the operation succeeded.
+
+The control doc (§10 backlog, runbook §8) uses exactly the §6 labels —
+no checkbox/mixed notation. (`[x]` beside `[pending]`, or `[done ...]`
+beside `[pending]`, describe one item in two vocabularies and disagree
+about which is authoritative.)
+
 ## 7. Verification and acceptance
 
 The acceptance gate is the runbook §9 checklist: extensions present
@@ -301,64 +323,126 @@ document"). Status labels per §6. A task leaves this list only when its
 evidence is recorded in runbook §8.
 
 ### Docker / images
-- [ ] All five images in `docker images`: `timescale/timescaledb-ha:pg16`,
+- [verified 2026-09-19] All five images in `docker images`: `timescale/timescaledb-ha:pg16`,
   `ollama/ollama:latest`, `apache/james:demo-3.8.2`, `python:3.12-slim`,
-  `httpd:latest`. [done 2026-09-19] (James re-added to the stack 2026-09-19 evening per Kit.)
-- [ ] `httpd -t` syntax check on `httpd/httpd.conf` once the httpd image lands. [pending]
-- [ ] Real container start verified (vfs, no bridge, `--network host`). [pending]
-- [ ] Docker socket mount vs real `docker:dind` — decision needed (ledger U-10)
-  before any nested orchestration. [pending]
+  `httpd:latest`. (James re-added to the stack 2026-09-19 evening per Kit.)
+- [pending] `httpd -t` syntax check on `httpd/httpd.conf` once the httpd image lands.
+- [pending] Real container start verified (vfs, no bridge, `--network host`).
+- [pending] Docker socket mount vs real `docker:dind` — decision needed (ledger U-10)
+  before any nested orchestration.
 
 ### IDE (code-server)
-- [x] Tarball extracted, server started, login page answers 200 (2026-09-19).
-- [ ] Python extension installed in code-server. [pending]
-- [ ] `ide` image built from `ide/Dockerfile`; browser access tested. [pending, needs docker]
+- [verified] Tarball extracted, server started, login page answers 200 (2026-09-19).
+- [pending] Python extension installed in code-server.
+- [pending, needs docker] `ide` image built from `ide/Dockerfile`; browser access tested.
 
 ### Configuration
-- [ ] TLS certificates for the 443 vhost (written, commented out). [pending]
-- [ ] Flask `app` service (`app:8000`, gunicorn) added to compose; `/app`
-  proxy target live. [pending]
+- [pending] TLS certificates for the 443 vhost (written, commented out).
+- [pending] Flask `app` service (`app:8000`, gunicorn) added to compose; `/app`
+  proxy target live.
 
 ### Extensions / AI
-- [ ] `nomic-embed-text` pulled; real 768-dim embedding verified. [in progress]
-- [ ] pgAI installed in a dedicated env; vectorizer API pinned. [blocked]
+- [in progress] `nomic-embed-text` pulled; real 768-dim embedding verified.
+- [blocked] pgAI installed in a dedicated env; vectorizer API pinned.
   (`ModuleNotFoundError: No module named 'pgai'` on reference host 2026-09-19)
-- [ ] Resolve what `timescaletools` denotes (ledger U-8). [pending]
-- [ ] Schema / vectorizer worker / DiskANN / semantic-search qualification. [pending]
-- [ ] Windows extension inventory (`timescaledb`, `vector`, `vectorscale`,
-  `ai`) on the Windows host. [pending, needs Windows host]
+- [pending] Resolve what `timescaletools` denotes (ledger U-8).
+- [pending] Schema / vectorizer worker / DiskANN / semantic-search qualification.
+- [pending, needs Windows host] Windows extension inventory (`timescaledb`, `vector`, `vectorscale`,
+  `ai`) on the Windows host.
 
 ### Windows host
-- [ ] Tailscale on Windows + SSH into the Windows host (~2026-09-23; the
-  WSL2-sshd leg of the old plan is dropped — Windows-only now). [pending]
-- [ ] Confirm Windows-side `PROJECT_ROOT` and `PGDATA` without rewriting
+- [pending] Tailscale on Windows + SSH into the Windows host (~2026-09-23; the
+  WSL2-sshd leg of the old plan is dropped — Windows-only now).
+- [pending] Confirm Windows-side `PROJECT_ROOT` and `PGDATA` without rewriting
   Kit's setup. [pending]
-- [ ] "Same GitHub keychain" decision: GHCR vs Docker Hub. [pending]
+- [pending] "Same GitHub keychain" decision: GHCR vs Docker Hub.
 
 ### Control plane (`control-plane/`)
-- [x] Core file-ops (`ScriptWriter` + `FileOps`), demo passes (2026-09-19).
-- [ ] Service control: httpd/postgres/ollama start-stop-status. [pending]
-- [ ] Docker orchestration via generated scripts (compose up/down/ps). [pending]
-- [ ] pgAI vectorizer calls. [pending]
-- [ ] Installer logic. [queued — after acceptance]
+- [verified] Core file-ops (`ScriptWriter` + `FileOps`), demo passes (2026-09-19).
+- [pending] Service control: httpd/postgres/ollama start-stop-status.
+- [pending] Docker orchestration via generated scripts (compose up/down/ps).
+- [pending] pgAI vectorizer calls.
+- [pending — after acceptance] Installer logic.
 
 ### Acceptance / installer
-- [ ] §9 checklist green **twice** on the Windows-only build. [pending]
-- [ ] Full installer (child goal) — queued until then.
-- [ ] Audit permissive chmod changes under surviving build paths. [pending]
+- [pending] §9 checklist green **twice** on the Windows-only build.
+- [pending — until acceptance green twice] Full installer (child goal).
+- [pending] Audit permissive chmod changes under surviving build paths.
 
 ### Path stability (Windows bootstrap)
-- [x] Design: PGDATA anchor + NTFS junction armor (`installer/PATH_STABILITY.md`,
+- [verified] Design: PGDATA anchor + NTFS junction armor (`installer/PATH_STABILITY.md`,
   2026-09-19). Compose db bind-mounts `${PGDATA_DIR}` (the anchor); siblings
   hang off `${LAMPY_DATA}` (anchor's parent).
-- [x] `installer/bootstrap-paths.ps1` rewritten anchor-first (`-PgData`, derives
-  data tree/home, `-MoveFrom` takes old anchor). [pending] not yet run on
-  Windows; PowerShell syntax unverified on the build machine — review before
-  first run.
-- [ ] First Windows run: create anchor, verify junctions, `docker compose up -d`
-  with the bind mounts. [pending, needs Windows host]
+- [verified] `installer/bootstrap-paths.ps1` rewritten anchor-first (`-PgData`, derives
+  data tree/home, `-MoveFrom` takes old anchor) (2026-09-19).
+- [pending] First Windows run of `bootstrap-paths.ps1`: PowerShell syntax unverified
+  on the build machine — review before first run.
+- [pending, needs Windows host] First Windows run: create anchor, verify junctions, `docker compose up -d`
+  with the bind mounts.
 
 ### Superseded 2026-09-19 (Windows-only first build — no WSL2 Ubuntu)
 - WSL2 Ubuntu app stack (runbook §3.6) — reference only.
 - WSL2-side Python venv (U-9 is now Windows-native only).
 - Reference-host + Windows+WSL2 double acceptance — now Windows-only twice.
+
+## 11. Critical-path review (2026-09-20)
+
+Dated review of what is on the critical path, what is blocked, and what can
+move before Kit's laptop access (~2026-09-23). Status labels per §6.
+Mirrors the "Lampy" Google Tasks list created 2026-09-20.
+
+### Spine: image → acceptance → installer
+1. Docker Hub CLI auth — [blocked]. Needs Kit's laptop (~Sept 23); the
+   Secure Vault cannot release the PAT to the CLI. This is the single
+   gating blocker: nothing downstream on the spine can move without it.
+2. Rebuild `kitcosby/lampy-single` via Build Cloud + push — [pending — after auth].
+3. Independent digest verification + `pressure-test.sh` until 0 FAIL —
+   [pending — after rebuild]. (Harness hardened 2026-09-20: `set -o pipefail`,
+   `RESULT`/`SUMMARY` records, §6.1 contract.)
+4. Runbook §9 acceptance checklist, twice, on the Windows-only build —
+   [pending — after clean image + Windows host].
+5. Full installer (child goal) — [pending — until acceptance green twice].
+
+### Ollama / Musey (Kit's priority #1)
+- Full Ollama v0.34.2 running locally, `/api/tags` OK — [verified].
+- `musey` (qwen3:0.6b) smoke test 3/5 — [verified, with known failures]:
+  honesty (breakfast confabulation) and failure-handling (Goldbach proof
+  bluff) FAIL. v2 prompt hardening did not fix it and regressed identity —
+  [verified] decision: v2 NOT promoted.
+- Next: larger-model test (qwen3:8b class) on Windows before user exposure —
+  [pending, needs Windows host]. Deploy idempotently to `C:\Lampy\data\ollama`;
+  seed the Musey admin account on the live DB at bring-up (one command).
+- Embeddings: `nomic-embed-text` pull + real 768-dim verification — [in progress].
+
+### Extension chain (§4): pgrx → TimescaleDB → pgvectorscale → pgAI
+- cargo-pgrx 0.19.2 installed — [in progress] (`pgrx init` against PG16 not run).
+- pgAI install — [blocked] on the reference host (`ModuleNotFoundError`);
+  first real attempt belongs on the Windows host.
+- Schema / vectorizer worker / DiskANN / semantic-search qualification —
+  [pending — after the chain].
+
+### Side work (when the spine is blocked)
+- `lampy-python`: self-tested on Linux, pushed — [pending] Windows exercise.
+- db-console: table browser + query runner — [pending]; auth hardening — [verified].
+- Payments: 26 unit tests pass, no live DB — [pending] live-DB schema apply +
+  integration tests at Windows bring-up.
+
+### Decisions needed from Kit (blocking larger work)
+- Docker socket mount vs `docker:dind` (ledger U-10) — [pending].
+- GHCR vs Docker Hub ("same GitHub keychain") — [pending].
+- Delete temporary Docker tag `pat-test` — [pending — awaiting Kit's go-ahead].
+
+### Deferred
+- Full pure-Python OS/C/GCC rebuild — feasibility study for a separate,
+  multi-year-scale program (GNU Mes/stage0 class). Does not move Lampy on
+  the weeks horizon.
+
+### Review findings
+- Before ~Sept 23, the only critical-path work runnable on the reference VM
+  is workflow/tooling hardening (this review, §6.1, the pressure-test
+  notation) and unblocked side work. No component installs should be
+  attempted against the reference host to "stay busy" — that is how the
+  pgAI `ModuleNotFoundError` dead end was produced.
+- Musey: the evidence (v1 + v2 transcripts) says prompt hardening is
+  insufficient; further prompt iterations would be speculative. The larger
+  base model on the Windows target is the recorded plan.

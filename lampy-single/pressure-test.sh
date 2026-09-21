@@ -20,11 +20,24 @@
 #
 # Usage: ./pressure-test.sh [image]
 # Exit: 0 if no FAIL, 1 otherwise. SKIP is not failure but is reported.
+#   Exit 2 = the harness itself is broken (missing tool on PATH).
+# Notation contract (WORKFLOW.md §6.1): every check emits exactly one
+#   RESULT<TAB><PASS|FAIL|SKIP><TAB><name><TAB><reason> record line;
+#   the run ends with one SUMMARY<TAB>pass=N<TAB>fail=M<TAB>skip=K line.
+#   Check names are single-line, tab-free. `set -o pipefail` is on, so a
+#   failure anywhere in a pipeline fails the check (pipes must not mask
+#   exit codes).
 #
 # Re-run after every Dockerfile/config change + rebuild. Findings go to
 # BUGLOG.md; fixes go in the Dockerfile; the loop ends when this is clean.
 
 set -u
+# pipefail: a pipeline's exit status is the LAST NONZERO status in the pipe,
+# not the last command's. Without this, `docker export | tar` reports tar's
+# success even when docker export fails, and `imagetools inspect | grep`
+# hides an inspect failure. (Workspace lesson: pipes mask exit codes —
+# never trust `cmd | tail`-style pipelines for pass/fail.)
+set -o pipefail
 IMAGE="${1:-kitcosby/lampy-single:latest}"
 # NOTE: /tmp on this machine is a 512MB tmpfs — far too small for a ~3GB
 # image export. Work goes under ~/workspace instead.
@@ -36,9 +49,15 @@ PASS=0; FAIL=0; SKIP=0
 FAILED_CHECKS=()
 
 log()  { printf '%s\n' "$*"; }
-pass() { PASS=$((PASS+1)); log "PASS  $1"; }
-fail() { FAIL=$((FAIL+1)); FAILED_CHECKS+=("$1"); log "FAIL  $1${2:+  -- $2}"; }
-skip() { SKIP=$((SKIP+1)); log "SKIP  $1${2:+  -- $2}"; }
+# result(): machine-readable record for every check, one per line:
+#   RESULT<TAB><PASS|FAIL|SKIP><TAB><check name><TAB><reason or empty>
+# Check names are single-line and contain no tabs, so `grep '^RESULT'`
+# output is reliably parseable and diffable across runs. The human-readable
+# PASS/FAIL/SKIP lines above are the log; these records are the notation.
+result() { printf 'RESULT\t%s\t%s\t%s\n' "$1" "$2" "$3"; }
+pass() { PASS=$((PASS+1)); log "PASS  $1"; result PASS "$1" ""; }
+fail() { FAIL=$((FAIL+1)); FAILED_CHECKS+=("$1"); log "FAIL  $1${2:+  -- $2}"; result FAIL "$1" "${2:-}"; }
+skip() { SKIP=$((SKIP+1)); log "SKIP  $1${2:+  -- $2}"; result SKIP "$1" "${2:-}"; }
 
 need() { command -v "$1" >/dev/null 2>&1 || { log "FATAL: need '$1' on PATH"; exit 2; }; }
 need docker; need python3
@@ -445,6 +464,7 @@ log ""
 # ---------------------------------------------------------------- summary
 log "=== summary ==="
 log "PASS: $PASS   FAIL: $FAIL   SKIP: $SKIP"
+printf 'SUMMARY\tpass=%d\tfail=%d\tskip=%d\n' "$PASS" "$FAIL" "$SKIP"
 if [ "$FAIL" -gt 0 ]; then
     log "failed checks:"
     printf '  - %s\n' "${FAILED_CHECKS[@]}"
