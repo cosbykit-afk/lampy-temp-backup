@@ -399,3 +399,37 @@ status. A fix that unblocks new work is noted as such.
 - Inference smoke test pending: the image's ollama binary lacks its runner
   libs (finding #2 above); downloading the full Ollama Linux tarball to run
   the first inference test.
+
+## 2026-09-21 — Ollama server down after VM reboot — RECOVERED
+
+- VM rebooted overnight (~04:10 PDT 2026-09-21; uptime showed 2h at 06:14).
+  `ollama serve` had been started manually (not via systemd — the reference
+  host has no running systemd), so it died with the old boot.
+- Models were intact the whole time: /home/hatch/workspace/ollama-test/models
+  (qwen3:0.6b, musey:latest, musey-v2:latest). The empty /home/hatch/.ollama
+  dir was a red herring — yesterday's server ran with
+  OLLAMA_MODELS=/home/hatch/workspace/ollama-test/models.
+- Recovery: restarted `ollama serve` (full distribution
+  /home/hatch/workspace/ollama-test/full/bin/ollama, v0.34.2) with
+  OLLAMA_MODELS=/home/hatch/workspace/ollama-test/models,
+  OLLAMA_HOST=http://127.0.0.1:11434; verified /api/version, `ollama list`
+  (3 models), and a live generation through musey:latest.
+- nomic-embed-text pull restarted in background 2026-09-21 06:15 PDT
+  (previous attempt 2026-09-19 failed on egress approval 403; model was
+  never in the manifest list).
+- **Status:** [recovered]; consider a boot-persistence mechanism so a VM
+  reboot doesn't silently drop the server (currently no systemd on this
+  host).
+
+## 2026-09-21 — nomic-embed-text pull — FAILED again (egress approval)
+
+- Retry started 2026-09-21 06:15 PDT after Ollama recovery; failed ~3.5 min in:
+  `Error: pull model manifest: 403: {"detail":"egress approval timed out;
+  the action was not performed.","error":"policy_denied","policy":"sentinel-policy"}`.
+- Same failure as 2026-09-19 session proc_758db3472100. The manifest fetch to
+  registry.ollama.ai is being denied by the egress approval policy; not a
+  transient network issue. Embedding path (pgAI vectorizer) still blocked on
+  this model; pgAI itself is still blocked on the Docker/Windows side anyway.
+- **Status:** [blocked — policy] do not retry blindly; needs egress approval
+  path or a pre-seeded model blob.
+- 2026-09-21 ~06:20 PDT: Kit directed shutdown — Ollama server (pid 10455) and llama-server (pid 10529) stopped, in-flight nomic-embed-text pull killed. Verified: port 11434 closed, no ollama processes remain. No web container running on this host (no docker/podman daemon, no httpd/nginx/forum app listening) — nothing else to stop here. Programming side PINNED until Kit has his laptop (~2026-09-23). Kit mentioned a pending decision about a terminal condition; no action taken.
