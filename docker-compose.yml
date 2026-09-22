@@ -50,6 +50,7 @@ services:
   db:
     image: timescale/timescaledb-ha:pg16
     container_name: lampy-db
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -59,7 +60,12 @@ services:
       # Anchor bind mount: PGDATA_DIR is the anchor chosen by
       # installer/bootstrap-paths.ps1. On the reference host PGDATA_DIR is
       # unset and this falls back to ./data/pgdata.
-      - ${PGDATA_DIR:-./data/pgdata}:/var/lib/postgresql/data
+      # Container path is /home/postgres/pgdata/data — that is the -ha
+      # image's actual PGDATA (it runs as the postgres user, not root).
+      # /var/lib/postgresql/data is the official postgres image's path and
+      # would leave the bind mount empty while data went to the ephemeral
+      # container layer (fixed 2026-09-22).
+      - ${PGDATA_DIR:-./data/pgdata}:/home/postgres/pgdata/data
 
   ollama:
     image: ollama/ollama:latest

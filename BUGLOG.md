@@ -433,3 +433,46 @@ status. A fix that unblocks new work is noted as such.
 - **Status:** [blocked — policy] do not retry blindly; needs egress approval
   path or a pre-seeded model blob.
 - 2026-09-21 ~06:20 PDT: Kit directed shutdown — Ollama server (pid 10455) and llama-server (pid 10529) stopped, in-flight nomic-embed-text pull killed. Verified: port 11434 closed, no ollama processes remain. No web container running on this host (no docker/podman daemon, no httpd/nginx/forum app listening) — nothing else to stop here. Programming side PINNED until Kit has his laptop (~2026-09-23). Kit mentioned a pending decision about a terminal condition; no action taken.
+
+## 2026-09-22 — lampy-single hard-crashes at boot when PASSWORD unset — CONFIRMED (found by Kit)
+
+- Kit ran `docker run kitcosby/lampy-single` on his Windows machine (Docker
+  Desktop) with no `-e` flags. supervisord (PID 1) refused to parse
+  `/etc/supervisor/conf.d/lampy.conf`:
+  `Format string 'PASSWORD="%(ENV_PASSWORD)s"' for 'environment' contains
+  names ('ENV_PASSWORD') which cannot be expanded` in section
+  `program:codeserver`. Container exits; the entire stack (postgres, apache2,
+  ollama, james, pgai-worker) never starts because of one unset variable for
+  an optional service (code-server IDE).
+- Root cause: `%(ENV_PASSWORD)s` expansion fails when PASSWORD is absent
+  from the container environment. POSTGRES_PASSWORD has the same latent
+  exposure wherever it is expanded. The Dockerfile's own example `docker run`
+  command only passes `-e POSTGRES_PASSWORD` and omits `-e PASSWORD`, so even
+  the documented example crashes.
+- The pressure test did NOT catch this: on the Linux sandbox it only does
+  `docker create` plus static checks; runtime boot checks are SKIPped there
+  ("run later"), and the config-syntax check doesn't evaluate env expansion.
+- Fix for the rebuild: make codeserver tolerant of a missing PASSWORD
+  (conditional program, entrypoint default, or wrapper script), and document
+  both required vars in the run example. Workaround until then: always pass
+  `-e PASSWORD=... -e POSTGRES_PASSWORD=...`.
+- **Status:** [open] fix queued for the image rebuild.
+
+## 2026-09-22 — docker-compose.yml db volume mounted the wrong container path (fixed)
+- The `db` service (image `timescale/timescaledb-ha:pg16`) bind-mounted
+  `${PGDATA_DIR:-./data/pgdata}` at `/var/lib/postgresql/data`. That is the
+  official `postgres` image's data path, not the `-ha` image's: the `-ha`
+  images run PostgreSQL as the `postgres` user with
+  `PGDATA=/home/postgres/pgdata/data`.
+- Effect: the anchor bind mount would have sat empty while real database
+  data landed in the container's ephemeral writable layer. Any
+  `docker compose down` / container recreation would silently lose the
+  database — the exact failure the PGDATA-anchor convention exists to
+  prevent.
+- Fix: container path changed to `/home/postgres/pgdata/data` (comment in
+  the compose file records why); also added `restart: unless-stopped` to
+  the db service to match httpd and the laptop one-shot script
+  (`lampy-setup-timescaledb.ps1`, which already used the correct path and
+  a named `pgdata` volume).
+- Noted while verifying storage for Kit's laptop database setup, 2026-09-22.
+- **Status:** [fixed] compose file corrected; YAML re-parsed clean.
