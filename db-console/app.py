@@ -186,6 +186,7 @@ PAGES = {slug: load_page(slug, d) for slug, d in SLUGS.items()}
 # ----------------------------------------------------------------------------
 
 VOLUMES = [
+    ("Front matter", ["title"]),
     ("Volume 0 — Exact Witnesses", ["vol0", "book20", "book21", "book22"]),
     ("Volume I — Books 0–6",
      ["book%d" % n for n in range(0, 7)]),
@@ -199,7 +200,8 @@ VOLUMES = [
 ]
 
 SHORT_LABELS = {"vol0": "Overview", "vol4": "Overview",
-                "tables": "Tables", "e8": "E8 notes", "index": "Home"}
+                "tables": "Tables", "e8": "E8 notes", "index": "Home",
+                "title": "Title page"}
 
 
 def short_label(slug, title):
