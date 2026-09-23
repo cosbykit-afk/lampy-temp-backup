@@ -230,6 +230,25 @@ assert progs, "no [program:*] sections"
 print("programs:", ", ".join(s.split(':',1)[1] for s in progs))
 EOF
 
+# Regression (2026-09-22 boot crash): no %(ENV_...)s expansion may remain in
+# supervisord.conf — an unset variable makes supervisord refuse the WHOLE
+# config and the container exits before any service starts. Programs that
+# need env must read it from the inherited environment (see
+# codeserver-start.sh), never via %(ENV_...)s.
+if grep -q '%(ENV_' "$SUP"; then
+    fail "supervisord.conf has no ENV expansion" \
+        "$(grep -o '%(ENV_[A-Za-z_]*)s' "$SUP" | sort -u | tr '\n' ' ')"
+else
+    pass "supervisord.conf has no ENV expansion"
+fi
+# The codeserver wrapper must exist, be executable, and tolerate empty PASSWORD.
+CS="$ROOTFS/usr/local/bin/codeserver-start.sh"
+if [ -x "$CS" ] && grep -q 'PASSWORD:-' "$CS"; then
+    pass "codeserver-start.sh tolerates missing PASSWORD"
+else
+    fail "codeserver-start.sh tolerates missing PASSWORD" "missing, not executable, or no \${PASSWORD:-} guard"
+fi
+
 # every supervisord command= binary and directory= must exist in the image
 # (resolved inside the rootfs — absolute symlinks must not escape to host).
 python3 - "$SUP" "$ROOTFS" <<'EOF' && pass "supervisord commands/dirs exist" || fail "supervisord commands/dirs exist"

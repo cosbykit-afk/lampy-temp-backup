@@ -456,7 +456,14 @@ status. A fix that unblocks new work is noted as such.
   (conditional program, entrypoint default, or wrapper script), and document
   both required vars in the run example. Workaround until then: always pass
   `-e PASSWORD=... -e POSTGRES_PASSWORD=...`.
-- **Status:** [open] fix queued for the image rebuild.
+- 2026-09-23: fixed via wrapper script `lampy-single/codeserver-start.sh`
+  (reads PASSWORD from the inherited environment; `--auth none` with a loud
+  log line when unset). The `environment=PASSWORD="%(ENV_PASSWORD)s"` line
+  is gone from supervisord.conf, so no `%(ENV_...)s` expansion remains
+  anywhere in the config — this whole class of parse-time crash is closed.
+  Dockerfile run example updated (PASSWORD documented optional).
+- **Status:** [fixed 2026-09-23] pending rebuild + real `docker run`
+  boot test with PASSWORD unset (the regression case Kit found).
 
 ## 2026-09-22 — docker-compose.yml db volume mounted the wrong container path (fixed)
 - The `db` service (image `timescale/timescaledb-ha:pg16`) bind-mounted
@@ -476,3 +483,181 @@ status. A fix that unblocks new work is noted as such.
   a named `pgdata` volume).
 - Noted while verifying storage for Kit's laptop database setup, 2026-09-22.
 - **Status:** [fixed] compose file corrected; YAML re-parsed clean.
+
+## 2026-09-22 — Apache James FATAL in lampy container: missing working.directory (fixed)
+- Symptom: `[program:james]` entered FATAL after 4 rapid retries; `james_err.log`
+  showed `MissingArgumentException: Server needs a working.directory env entry`
+  on every attempt. No Java process running.
+- Root cause (found by experiment, not docs): James 3.8.2's
+  `JPAJamesConfiguration$Builder.useWorkingDirectoryEnvProperty()` reads
+  `working.directory` as a **JVM system property** (`-Dworking.directory=...`),
+  despite the error message saying "env entry". Verified: `env
+  'working.directory=...' java -jar ...` still threw; adding
+  `-Dworking.directory=/opt/james/james-server-jpa-guice` booted James fully
+  (ActiveMQ broker up; clean shutdown on timeout).
+- Fix (in-container, survives `docker restart` via the writable layer):
+  `/etc/supervisor/conf.d/lampy.conf` `[program:james]` command changed to
+  `/usr/bin/java -Dworking.directory=/opt/james/james-server-jpa-guice -jar
+  james-server-jpa-app.jar`; also added `[unix_http_server]` +
+  `[supervisorctl]` + `[rpcinterface:supervisor]` sections so `supervisorctl`
+  works going forward (it previously failed with "no such file" for the sock).
+- Verified 2026-09-22 ~10:55 PT: `supervisorctl status` shows james RUNNING
+  (past startsecs); host port 2525 banners `220 Apache JAMES awesome SMTP
+  Server`.
+- **Status:** [fixed] on the live `lampy` container. NOTE: the image
+  `kitcosby/lampy-single:latest` still carries the broken command — the next
+  image rebuild must bake in the `-Dworking.directory` flag (and the
+  supervisorctl socket sections), or the bug returns on a fresh container.
+
+## 2026-09-22 — apache2 FATAL after lampy restart: stale pidfile (fixed, self-inflicted)
+- After `docker restart lampy` (for the James fix), apache2 went FATAL:
+  `apache2ctl` exited 0 immediately with `httpd (pid 30) already running`.
+- Root cause: `/var/run/apache2/apache2.pid` survived the container restart
+  (dated 09:12, pre-restart) containing the old pid 30; apache2ctl trusted it.
+  (Notable: /var/run was NOT cleared by `docker restart` on this host.)
+- Fix: deleted the stale pidfile inside the container; apache2 RUNNING after
+  the next restart. Lesson: on this host, always clear
+  `/var/run/apache2/apache2.pid` (and check for other stale pidfiles) after
+  restarting the lampy container.
+- **Status:** [fixed].
+
+## 2026-09-22 — pgai-worker FATAL in lampy container (pre-existing, open)
+- `pgai-worker` exits 1 immediately: `vectorizer-worker extra is not installed,
+  please install it with 'pip install pgai[vectorizer-worker]'`.
+- Pre-existing: it was already FATAL before any 2026-09-22 changes (absent from
+  `ps aux` at 10:35 PT). Blocks the pgAI vectorizer worker the populate phase
+  will need for semantic search.
+- Suggested fix: inside the lampy container run
+  `pip install "pgai[vectorizer-worker]"`, then `supervisorctl start
+  pgai-worker`. Untested — left for the populate phase.
+- **Status:** [open].
+
+## 2026-09-22 — docker credential helper unusable over SSH on Toetop (workaround in place)
+- Symptom: every `docker pull`/`docker push` from the `toetop\muse` SSH session
+  fails with `error getting credentials - err: exit status 1, out: 'A specified
+  logon session does not exist. It may already have been terminated.'`
+- Root cause: Docker Desktop's `docker-credential-desktop.exe` requires an
+  interactive Windows logon session; the SSH session has none. Verified the
+  helper binary itself fails the same way when invoked directly. Unaffected:
+  all local docker ops (build/run/ps/logs/load). Persists even with
+  `--config` pointing at a fresh dir with `"credsStore": ""` — the Desktop
+  CLI build (29.8.0) consults the helper for registry ops regardless.
+- Workaround used: fetched `python:3.12-slim` (linux/amd64,
+  sha256:44ff437bba879d4941b710a369a8f19266aea34b29002807f0c487fabc9eec9b)
+  through the registry HTTP API (anonymous token) and `docker load`ed it —
+  no credential helper involved. Image present as `python:3.12-slim` (177MB).
+- Implication for the push phase: `docker push` from this SSH session will
+  fail the same way. Options: Kit runs the push interactively, or test whether
+  explicit base64 `auths` entries in a config.json bypass the helper for push.
+- **Status:** [open] workaround in place for pulls; push path needs Kit or a
+  helper-bypass test.
+
+## 2026-09-22 — 5-min load-test numbers contaminated by concurrent large download (Kit's report)
+
+- Kit reported he was running a LARGE DOWNLOAD on Toetop during the failed
+  5-minute run (assumed ~half effective bandwidth + host CPU/disk contention
+  under Docker Desktop). The generator ran on Toetop, so the download did not
+  add network latency to requests directly, but it contended for CPU/disk with
+  gunicorn, Docker Desktop, and PostgreSQL.
+- Consequence: the 5-min results (41.3 rps, p95 633 ms, 3 write timeouts at
+  15 s) are NOT a clean app measurement. The in-container loopback burst
+  (download-independent) shows the app's own ceiling at 71 rps / p95 353 ms
+  with 0 errors — the download explains the extra degradation.
+- **The clean 5-min re-run must be measured with NO concurrent download.**
+  Tuning was deliberately kept minimal (not overtuned to chase contaminated
+  numbers).
+- **Status:** [recorded] — noted in `min-recommended-config.md` and README §8.
+
+## 2026-09-22 — app-side performance tuning (minimum recommended config)
+
+- Diagnosis (evidence, one variable at a time):
+  - `docker inspect` CMD was `gunicorn -w 3 -b 0.0.0.0:8000 app:app` (sync);
+    container `nproc` = 8.
+  - `app.py: db()` opened a fresh `psycopg.connect()` per request and closed it
+    in teardown — no pooling.
+  - Measured from the container: connect 14.9 ms vs query 5.1 ms (every request
+    paid ~3x its query time in connection setup).
+  - SMTP round-trip 7 ms — mail ruled OUT as the write bottleneck.
+  - In-container burst (24 threads x 10 s, loopback, `/tmp/burst.py`):
+    71.2 rps, p50 335 ms, p95 353 ms, 0 errs — near-uniform latencies prove
+    queueing behind 3 sync workers (~75 ms service x 3 workers ~= 40 rps ceiling).
+- Changes (Toetop `C:\Lampy\forum\`; local copies in
+  `~/workspace/forum-stack/tuned/`):
+  - `Dockerfile` CMD -> `gunicorn -w 4 --threads 4 --worker-class gthread -b 0.0.0.0:8000 --timeout 30 app:app`
+  - `app.py`: one `psycopg_pool.ConnectionPool` per worker (lazy post-fork via
+    `_pool()`/`_pool_instance`; `min_size=2 max_size=8 max_idle=300 timeout=10.0`);
+    `db()` uses `getconn()`; teardown rolls back non-IDLE conns then `putconn()`.
+    Bug caught before deploy: first draft shadowed the `_pool` global with the
+    `_pool()` function name (would have returned the function); fixed to
+    `_return _pool_instance`.
+  - `config.py`: `DB_POOL_MIN/MAX/IDLE` (env `FORUM_DB_POOL_MIN/MAX/IDLE`,
+    defaults 2/8/300), `TEMPLATES_AUTO_RELOAD` off by default (env
+    `FORUM_TEMPLATES_RELOAD=1` to re-enable).
+  - `requirements.txt`: added `psycopg-pool>=3.2` (installed 3.3.3).
+- Exact commands (exit codes): `docker build -t lampy-forum-app C:\Lampy\forum`
+  (exit 0, ~125 s first build / ~5 s rebuild); `docker stop lampy-forum-app &&
+  docker rm lampy-forum-app && docker run -d --name lampy-forum-app
+  --restart unless-stopped -p 8081:8000 --env-file C:\Lampy\forum\app.env
+  lampy-forum-app` (exit 0; container 9b301cde...). Verified 1 master + 4
+  workers via /proc cmdlines; pool checkout+query OK (`min=2 max=8 idle=300.0`).
+- Before -> after (same burst): 71.2 -> **250.4 rps**, p50 335 -> **87 ms**,
+  p95 353 -> **169 ms**, p99 209 ms, 0 errors (first post-restart burst showed
+  12 transient boot errors / 0.5%; clean re-run 0).
+- Functional smoke (`/tmp/smoke.py`, exit 0): register -> login -> new thread
+  (/thread/2309) -> reply all 200; GET / /docs /docs/er-diagram(+/image,
+  161545 B) /docs/context-diagram(+/image, 207830 B) /metrics /search?q=smoke
+  all 200; host-side `http://127.0.0.1:8081/` /docs /metrics all 200.
+- DB untouched (no config/role/password changes); `app.env` values untouched
+  (read only via container env; never printed).
+- **Status:** [verified] — deliverable `~/workspace/forum-stack/min-recommended-config.md`;
+  5-min target believed reachable pending a CLEAN re-run (no download).
+
+## 2026-09-22 ~11:40 PT — up-phase re-verify (workflow lampy-forum-live re-run, explicit:up-1)
+
+- `timescaledb` Up (host 5433→5432 published); `lampy-forum-app` Up (restart=unless-stopped,
+  host **8081**→container 8000; host 8080 is owned by the `lampy` container — documented
+  deviation, unchanged). Image `lampy-forum-app` built on Toetop 2026-09-22 18:36:47 UTC
+  (tuned gthread 4x4 config from the minimum-recommended-config pass).
+- Code on Toetop (`C:\Lampy\forum\app.py` 18290 B, `config.py` 1940 B,
+  `requirements.txt` 63 B + `psycopg-pool>=3.2`) is NEWER than `~/workspace/forum`
+  (16428 / 1176 / 45 B) — intentionally NOT overwritten (idempotence: the deployed
+  version carries the pool tuning + /docs routes + TEMPLATES_AUTO_RELOAD; the workspace
+  copy is stale relative to production). Tuned mirrors live in
+  `~/workspace/forum-stack/tuned/` per the earlier tuning entry.
+- Extension inventory unchanged (\dx on Toetop, exit 0): ai 0.8.0, timescaledb 2.30.1,
+  vector 0.8.6, vectorscale 0.9.1, plpython3u, plpgsql. `forum_events` hypertable ✓;
+  `forum_daily` present in `timescaledb_information.continuous_aggregates` ✓ (plain view
+  over the cagg materialization — see earlier finding). 3 seed categories present.
+- Grants re-verified for role `forum`: CONNECT on forum DB ✓, USAGE on public ✓, full
+  DML on public.posts ✓. FIX APPLIED 2026-09-22 ~11:41 PT: `GRANT USAGE ON SCHEMA ai
+  TO forum` (exit 0) — the app's search probe was logging "permission denied for schema
+  ai" and degrading; /search still reports mode=keyword (no pgAI vectorizer yet —
+  populate phase owns that).
+- `C:\Lampy\forum\app.env` ACL confirmed `TOETOP\muse:(F)` only (Get-Acl); no secret
+  values read back, printed, or transmitted (postgres superuser password read only
+  inside a Toetop shell into PGPASSWORD for psql).
+- E2E (`C:\Lampy\forum\forum-e2e.ps1`, exit 0, run 11:40 PT): 10/10 PASS — register
+  302→/ → new thread 302→/thread/2310 → reply visible → /metrics 200 → /search?q=e2e
+  200 mode=keyword → logout 302. Test user was `e2e_114044`.
+- DB cleanup: deleted 1158 throwaway users total (78 first pass incl. my `e2e_114044`,
+  `smoke*`, `dbg*`, `load_w*`; then 1080 `loadu_*` — note the first `load#_%` ESCAPE
+  pattern matched only the literal-underscore `load_w*` names, not `loadu_*`, so a
+  second pass `username <> 'docs_admin'` took the rest), 2308 threads, 4472 posts,
+  7938 forum_events. Remaining: `docs_admin` (1 user), "Welcome -- diagrams live under
+  /docs" (thread id 2, 3 posts), docs=2 rows, categories=3 — kept as the
+  clearly-labeled demo content.
+- KNOWN ISSUE (non-blocking, not fixed this phase): app log shows
+  `ValueError: can't return connection to pool 'pool-4', it comes from pool 'pool-3'`
+  (2026-09-22 ~18:37 UTC) — the lazy `_pool()` can create a second ConnectionPool when
+  two gthread threads race first use in one worker; teardown then returns a connection
+  to the wrong pool. Requests still succeed (e2e 10/10 PASS); fix = a lock around pool
+  creation. Left alone per one-variable rule (no failing check).
+- James (lampy container): `supervisorctl status` → james RUNNING (uptime 0:51:49 at
+  11:43 PT; supervisord log 17:49:35 UTC "success: james entered RUNNING state") — the
+  2026-09-22 ~10:55 PT FATAL fix holds. Note: app welcome mail to @example.com
+  addresses gets `550 5.7.1 relaying denied` (18:38 UTC app log) — expected anti-relay
+  behavior for arbitrary external domains; external-relay policy for real addresses
+  still needs config (mail is best-effort, does not block this phase). pgai-worker
+  still FATAL (pre-existing, already [blocked]).
+- **Status:** [verified] — forum up and linked, base URL http://192.168.1.57:8081
+  (tailnet http://100.67.27.7:8081).

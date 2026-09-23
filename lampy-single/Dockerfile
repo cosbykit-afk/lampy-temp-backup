@@ -19,7 +19,10 @@
 #   docker run -d --name lampy ^
 #     -p 80:80 -p 443:443 -p 5432:5432 -p 11434:11434 -p 8080:8080 ^
 #     -p 2525:2525 -p 2465:2465 -p 2587:2587 -p 1143:1143 -p 1993:1993 -p 1110:1110 ^
-#     -e POSTGRES_PASSWORD=... -e PASSWORD=... ^
+#     -e POSTGRES_PASSWORD=... [-e PASSWORD=...] ^
+#   PASSWORD is optional: when unset, code-server starts with --auth none
+#   (see codeserver-start.sh). POSTGRES_PASSWORD is required by postgres
+#   and the pgai worker.
 #     -v C:\Lampy\data\pgdata:/home/postgres/pgdata ^
 #     -v C:\Lampy\data\ollama:/root/.ollama ^
 #     lampy:latest
@@ -29,8 +32,15 @@
 #   apache2      apache2ctl -D FOREGROUND          (port 80; vhost lampy-single/apache2-lampy.conf)
 #   ollama       ollama serve                      (0.0.0.0:11434; models in /root/.ollama)
 #   james        java -jar james-server-jpa-app.jar (Kit's port remap baked into conf/)
-#   code-server  browser IDE on :8080 (PASSWORD env, required)
+#   code-server  browser IDE on :8080 (PASSWORD env, OPTIONAL since 2026-09-23:
+#                codeserver-start.sh falls back to --auth none when unset, so a
+#                missing PASSWORD can never crash supervisord at parse time)
 #   pgai-worker  pgai vectorizer worker (POSTGRES_PASSWORD env, required)
+#
+# Gwen (2026-09-23): the Lampy administrator model (qwen3:0.6b +
+# lampy-single/Modelfile.gwen) is baked into /root/.ollama at build time,
+# so she is present on first boot with no pull needed. Her system prompt
+# ships in the image — anyone who pulls it can read it.
 #
 # Pending at image build time (unchanged from the multi-service stack):
 #   - pgai/pgvectorscale extensions in the DB need the pgrx build (not in image).
@@ -52,6 +62,19 @@ COPY --from=ollama-src /usr/bin/ollama /usr/bin/ollama
 # works, but every model run fails with "llama-server binary not found"
 # because the runner lives in /usr/lib/ollama. Copy the whole lib dir.
 COPY --from=ollama-src /usr/lib/ollama /usr/lib/ollama
+
+# Gwen, baked in: pull the base weights and create the administrator model
+# at build time so the image ships with her in /root/.ollama.
+# (Build-cloud and Docker Desktop builders have normal internet access;
+# the sandbox's egress proxy does not, so do not build this stage there.)
+COPY lampy-single/Modelfile.gwen /tmp/Modelfile.gwen
+RUN (ollama serve >/tmp/ollama-build.log 2>&1 & echo $! >/tmp/ollama.pid) && \
+    sleep 10 && \
+    ollama pull qwen3:0.6b && \
+    ollama create gwen -f /tmp/Modelfile.gwen && \
+    ollama list && \
+    kill "$(cat /tmp/ollama.pid)" && \
+    rm -f /tmp/Modelfile.gwen /tmp/ollama.pid /tmp/ollama-build.log
 
 RUN mkdir -p /usr/share/man/man1 \
     && apt-get update && apt-get install -y --no-install-recommends \
@@ -83,7 +106,8 @@ RUN a2dissite 000-default && a2ensite lampy && a2enmod proxy proxy_http
 # Supervisord program definitions.
 COPY lampy-single/supervisord.conf /etc/supervisor/conf.d/lampy.conf
 COPY lampy-single/pgai-worker.sh /usr/local/bin/pgai-worker.sh
-RUN chmod +x /usr/local/bin/pgai-worker.sh \
+COPY lampy-single/codeserver-start.sh /usr/local/bin/codeserver-start.sh
+RUN chmod +x /usr/local/bin/pgai-worker.sh /usr/local/bin/codeserver-start.sh \
     && mkdir -p /var/log/supervisor /var/run/supervisor \
     && mkdir -p /var/run/apache2 /var/lock/apache2 \
     && rm -rf /tmp/hsperfdata_root
