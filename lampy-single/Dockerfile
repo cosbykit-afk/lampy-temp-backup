@@ -89,7 +89,7 @@ RUN mkdir -p /usr/share/man/man1 \
 # NOTE: no --break-system-packages here — the base is Ubuntu jammy with
 # pip 22.0.2, which predates that flag (pip >= 23) and has no
 # EXTERNALLY-MANAGED enforcement, so plain pip install works.
-RUN pip install --no-cache-dir pgai
+RUN pip install --no-cache-dir "pgai[vectorizer-worker]"
 
 # James with Kit's config (port remap 2525/2465/2587/1143/1993/1110 in conf/).
 COPY james/james-server-jpa-guice /opt/james/james-server-jpa-guice
