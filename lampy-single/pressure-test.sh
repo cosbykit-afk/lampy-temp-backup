@@ -248,6 +248,12 @@ if [ -x "$CS" ] && grep -q 'PASSWORD:-' "$CS"; then
 else
     fail "codeserver-start.sh tolerates missing PASSWORD" "missing, not executable, or no \${PASSWORD:-} guard"
 fi
+# Missing PASSWORD must DISABLE code-server, never expose it unauthenticated.
+if grep -q -- '--auth none' "$CS"; then
+    fail "codeserver-start.sh never uses --auth none" "found --auth none: unauthenticated exposure"
+else
+    pass "codeserver-start.sh never uses --auth none"
+fi
 
 # every supervisord command= binary and directory= must exist in the image
 # (resolved inside the rootfs — absolute symlinks must not escape to host).

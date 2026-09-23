@@ -457,10 +457,14 @@ status. A fix that unblocks new work is noted as such.
   both required vars in the run example. Workaround until then: always pass
   `-e PASSWORD=... -e POSTGRES_PASSWORD=...`.
 - 2026-09-23: fixed via wrapper script `lampy-single/codeserver-start.sh`
-  (reads PASSWORD from the inherited environment; `--auth none` with a loud
-  log line when unset). The `environment=PASSWORD="%(ENV_PASSWORD)s"` line
+  (reads PASSWORD from the inherited environment; code-server stays DISABLED
+  with a loud log line when unset — port 8080 never opens without a
+  password). The `environment=PASSWORD="%(ENV_PASSWORD)s"` line
   is gone from supervisord.conf, so no `%(ENV_...)s` expansion remains
   anywhere in the config — this whole class of parse-time crash is closed.
+  (An earlier draft of the wrapper fell back to `--auth none`; corrected
+  2026-09-23 — the IDE must never be exposed unauthenticated merely because
+  the password is absent.)
   Dockerfile run example updated (PASSWORD documented optional).
 - **Status:** [fixed 2026-09-23] pending rebuild + real `docker run`
   boot test with PASSWORD unset (the regression case Kit found).

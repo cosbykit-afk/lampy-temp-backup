@@ -20,8 +20,8 @@
 #     -p 80:80 -p 443:443 -p 5432:5432 -p 11434:11434 -p 8080:8080 ^
 #     -p 2525:2525 -p 2465:2465 -p 2587:2587 -p 1143:1143 -p 1993:1993 -p 1110:1110 ^
 #     -e POSTGRES_PASSWORD=... [-e PASSWORD=...] ^
-#   PASSWORD is optional: when unset, code-server starts with --auth none
-#   (see codeserver-start.sh). POSTGRES_PASSWORD is required by postgres
+#   PASSWORD is optional: when unset, code-server stays DISABLED (port 8080
+#   stays closed; see codeserver-start.sh). POSTGRES_PASSWORD is required by postgres
 #   and the pgai worker.
 #     -v C:\Lampy\data\pgdata:/home/postgres/pgdata ^
 #     -v C:\Lampy\data\ollama:/root/.ollama ^
@@ -33,7 +33,7 @@
 #   ollama       ollama serve                      (0.0.0.0:11434; models in /root/.ollama)
 #   james        java -jar james-server-jpa-app.jar (Kit's port remap baked into conf/)
 #   code-server  browser IDE on :8080 (PASSWORD env, OPTIONAL since 2026-09-23:
-#                codeserver-start.sh falls back to --auth none when unset, so a
+#                codeserver-start.sh DISABLES the IDE when unset, so a
 #                missing PASSWORD can never crash supervisord at parse time)
 #   pgai-worker  pgai vectorizer worker (POSTGRES_PASSWORD env, required)
 #
