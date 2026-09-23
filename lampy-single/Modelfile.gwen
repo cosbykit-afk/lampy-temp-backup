@@ -4,10 +4,13 @@
 # downloadable). It is an open-weights base model plus a personality and
 # parameters, created with:  ollama create gwen -f Modelfile.gwen
 #
-# Deploying on Windows: models live in Ollama's data dir, NOT in the image.
-# With the Lampy layout that is the C:\Lampy\data\ollama volume. Re-run the
-# `ollama create` command there after `ollama pull <base>`; or ship this file
-# and create it from a setup script.
+# Deploying on Windows (Toetop host): models live in Ollama's data dir,
+# e.g. the C:\Lampy\data\ollama volume. Re-run the `ollama create` command
+# there after `ollama pull <base>`.
+#
+# The lampy-single Docker image is different: its Dockerfile bakes this
+# model into /root/.ollama at build time, so Gwen ships inside the image
+# and is present on first boot with no pull needed.
 #
 # Swap the FROM line for a larger base (e.g. qwen3:8b, llama3.1:8b) when the
 # host has the RAM/VRAM for it. The SYSTEM prompt below stays the same.
