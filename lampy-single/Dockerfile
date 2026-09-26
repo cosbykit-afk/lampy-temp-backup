@@ -84,12 +84,21 @@ RUN mkdir -p /usr/share/man/man1 \
       supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# pgAI vectorizer worker dependency (the DB-side pgai extension still
-# needs the pgrx build; the worker starts regardless and polls).
+# pgAI vectorizer worker dependency — installed from a pre-downloaded
+# wheelhouse instead of PyPI. The satellite link repeatedly corrupted or
+# killed the giant torch/nvidia wheels mid-build (build attempt 1: SHA256
+# mismatch on nvidia-nccl-cu13; attempt 3: buildx EOF during the 554MB
+# torch download), so the full dependency closure (208 wheels, ~3.2GB) is
+# staged as build-context dir `wheelhouse/` OUT-OF-BAND (not committed to
+# git) and pip installs offline with --no-index. torch is pinned to 2.14.0
+# to match the staged resolution.
 # NOTE: no --break-system-packages here — the base is Ubuntu jammy with
 # pip 22.0.2, which predates that flag (pip >= 23) and has no
 # EXTERNALLY-MANAGED enforcement, so plain pip install works.
-RUN pip install --no-cache-dir "pgai[vectorizer-worker]"
+COPY wheelhouse /opt/wheelhouse
+RUN pip install --no-cache-dir --no-index --find-links=/opt/wheelhouse \
+      "pgai[vectorizer-worker]" torch==2.14.0 \
+    && rm -rf /opt/wheelhouse
 
 # James with Kit's config (port remap 2525/2465/2587/1143/1993/1110 in conf/).
 COPY james/james-server-jpa-guice /opt/james/james-server-jpa-guice
