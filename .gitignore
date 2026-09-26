@@ -13,3 +13,4 @@ __pycache__/
 c-ide/__pycache__/
 c-ide/workspace/
 *.log
+lampy-single/ollama-donor/

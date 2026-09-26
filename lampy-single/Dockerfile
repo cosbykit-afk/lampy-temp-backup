@@ -50,18 +50,20 @@
 # phase 6). Re-pin deliberately when moving to a newer base.
 FROM timescale/timescaledb-ha:pg16@sha256:4f288c0a521362cad799f265bc0ebd60c3f8f98596b850172cc2da72883420ff AS base
 
-# Ollama binary donor stage (verified path /usr/bin/ollama in image layers).
-FROM ollama/ollama:latest@sha256:da6e0dc5651df159e45686fd663c4dbe1624a52c44d7280eeac1551d8f865532 AS ollama-src
-
 FROM base
 USER root
 ENTRYPOINT []
 
-COPY --from=ollama-src /usr/bin/ollama /usr/bin/ollama
+# Ollama binary donor files, vendored (2026-09-26): extracted byte-identical
+# from ollama/ollama:latest@sha256:da6e0dc5651df159e45686fd663c4dbe1624a52c44d7280eeac1551d8f865532
+# via the last good image, so the build no longer pulls from Docker Hub
+# (the Windows credential helper fails without an interactive logon session).
+# Re-vendor deliberately when moving to a newer Ollama.
+COPY lampy-single/ollama-donor/usr/bin/ollama /usr/bin/ollama
 # The CLI alone cannot run inference: `ollama serve` starts and /api/tags
 # works, but every model run fails with "llama-server binary not found"
 # because the runner lives in /usr/lib/ollama. Copy the whole lib dir.
-COPY --from=ollama-src /usr/lib/ollama /usr/lib/ollama
+COPY lampy-single/ollama-donor/usr/lib/ollama /usr/lib/ollama
 
 # Gwen, baked in: pull the base weights and create the administrator model
 # at build time so the image ships with her in /root/.ollama.
