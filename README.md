@@ -127,7 +127,7 @@ docker pull timescale/timescaledb-ha:pg16
 docker run -d --name timescaledb --restart unless-stopped `
   -p 5432:5432 `
   -v pgdata:/home/postgres/pgdata/data `
-  -e POSTGRES_PASSWORD='<strong-password>' `
+  -e POSTGRES_PASSWORD=REPLACE_WITH_YOUR_PASSWORD>' `
   timescale/timescaledb-ha:pg16
 ```
 
